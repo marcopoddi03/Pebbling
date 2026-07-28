@@ -30,7 +30,7 @@ with open(in_filename, 'r') as f_in, open(out_filename, 'w') as f_out:
 
     for line in f_in:
 
-        new_walk_steps = [] 
+        #new_walk_steps = [] 
         buffer_walk_steps = []
         description, walk = line.rstrip('\r\n').rsplit("\t", 1)
 
@@ -56,10 +56,13 @@ with open(in_filename, 'r') as f_in, open(out_filename, 'w') as f_out:
             if ref_steps[k][1] == step_walk[1]:
                 
                 if start_k is not None and (k > start_k + 1 or j > start_j + 1):
-                    new_walk_steps.extend(ref_steps[start_k + 1 : k])
+                    #new_walk_steps.extend(ref_steps[start_k + 1 : k])
+                    for m in ref_steps[start_k + 1 : k]:
+                        f_out.write(f"{m[0]}{m[1]}")
                     buffer_walk_steps = []
                 
-                new_walk_steps.append(step_walk)
+                #new_walk_steps.append(step_walk)
+                f_out.write(f"{step_walk[0]}{step_walk[1]}")
 
                 start_k = k
                 start_j = j
@@ -76,7 +79,9 @@ with open(in_filename, 'r') as f_in, open(out_filename, 'w') as f_out:
                 k += 1
             else:
                 if start_k is None:
-                    new_walk_steps.append(step_walk)
+                    #new_walk_steps.append(step_walk)
+                    f_out.write(f"{step_walk[0]}{step_walk[1]}")
+
                 else:
                     buffer_walk_steps.append(step_walk)
                 try:
@@ -87,10 +92,12 @@ with open(in_filename, 'r') as f_in, open(out_filename, 'w') as f_out:
                 j += 1
 
         if buffer_walk_steps:
-            new_walk_steps.extend(buffer_walk_steps)
-
+            #new_walk_steps.extend(buffer_walk_steps)
+            for m in buffer_walk_steps:
+                f_out.write(f"{m[0]}{m[1]}")
         if step_walk is not None:
-            new_walk_steps.append(step_walk)
+            #new_walk_steps.append(step_walk)
+            f_out.write(f"{step_walk[0]}{step_walk[1]}")
 
-        new_walk = "".join(f"{orientation}{segment}" for orientation, segment in new_walk_steps) + "".join(f"{orientation}{segment}" for orientation, segment in iterator_walk)
+        new_walk = "".join(f"{orientation}{segment}" for orientation, segment in iterator_walk)
         f_out.write(new_walk+"\r\n")
