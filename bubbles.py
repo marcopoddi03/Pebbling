@@ -25,13 +25,12 @@ with open(in_filename, 'r') as f_in, open(out_filename, 'w') as f_out:
 
     ref = write_graph_lines_and_get_ref(f_in, f_out)
     f_out.write(ref)
-    ref_steps = [(m[0], int(m[1:])) for m in re.findall(r'[<>]\d+', ref)]
-    del ref
+    ref_walk = ref.rstrip('\r\n').rsplit("\t", 1)[1]
 
     for line in f_in:
 
-        #new_walk_steps = [] 
         buffer_walk_steps = []
+        buffer_ref_steps = []
         description, walk = line.rstrip('\r\n').rsplit("\t", 1)
 
         f_out.write(description + "\t")
@@ -43,26 +42,32 @@ with open(in_filename, 'r') as f_in, open(out_filename, 'w') as f_out:
 
 
         iterator_walk = iter_walk(walk)
+        iterator_ref = iter_walk(ref_walk)
 
         try:
             step_walk = next(iterator_walk)
         except StopIteration:
             f_out.write("\r\n")
             continue;
+
+        try:
+            step_ref = next(iterator_ref)
+        except StopIteration:
+            break
         
-        while k < len(ref_steps):
+        while True:
             
             
-            if ref_steps[k][1] == step_walk[1]:
+            if step_ref[1] == step_walk[1]:
                 
                 if start_k is not None and (k > start_k + 1 or j > start_j + 1):
-                    #new_walk_steps.extend(ref_steps[start_k + 1 : k])
-                    for m in ref_steps[start_k + 1 : k]:
+                    for m in buffer_ref_steps:
                         f_out.write(f"{m[0]}{m[1]}")
                     buffer_walk_steps = []
                 
-                #new_walk_steps.append(step_walk)
                 f_out.write(f"{step_walk[0]}{step_walk[1]}")
+
+                buffer_ref_steps = []
 
                 start_k = k
                 start_j = j
@@ -74,12 +79,21 @@ with open(in_filename, 'r') as f_in, open(out_filename, 'w') as f_out:
                     step_walk = None
                     break
                 j += 1
+                try:
+                    step_ref = next(iterator_ref)
+                except StopIteration:
+                    break
                 
-            elif ref_steps[k][1] < step_walk[1]:
+            elif step_ref[1] < step_walk[1]:
+                if start_k is not None:
+                    buffer_ref_steps.append(step_ref)
+                try:
+                    step_ref = next(iterator_ref)
+                except StopIteration:
+                    break
                 k += 1
             else:
                 if start_k is None:
-                    #new_walk_steps.append(step_walk)
                     f_out.write(f"{step_walk[0]}{step_walk[1]}")
 
                 else:
@@ -92,11 +106,9 @@ with open(in_filename, 'r') as f_in, open(out_filename, 'w') as f_out:
                 j += 1
 
         if buffer_walk_steps:
-            #new_walk_steps.extend(buffer_walk_steps)
             for m in buffer_walk_steps:
                 f_out.write(f"{m[0]}{m[1]}")
         if step_walk is not None:
-            #new_walk_steps.append(step_walk)
             f_out.write(f"{step_walk[0]}{step_walk[1]}")
 
         new_walk = "".join(f"{orientation}{segment}" for orientation, segment in iterator_walk)
