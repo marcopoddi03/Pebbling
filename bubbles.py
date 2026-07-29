@@ -1,4 +1,5 @@
 import re
+import sys
 
 def write_graph_lines_and_get_ref(f_in, f_out):
     for line in f_in:
@@ -16,10 +17,13 @@ def iter_walk(walk):
         yield orientation, segment
 
 
+if len(sys.argv) > 1:
+    in_filename = sys.argv[1]
+else:
+    print('Enter file name:')
+    in_filename = input()
 
-print('Enter file name:')
-in_filename = input()
-out_filename = "modified_" + in_filename
+out_filename = "revised_" + in_filename
 
 with open(in_filename, 'r') as f_in, open(out_filename, 'w') as f_out:
 
