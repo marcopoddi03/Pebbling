@@ -1,4 +1,5 @@
 import re
+import sys
 
 def write_graph_lines_and_get_ref(f_in, f_out):
     for line in f_in:
@@ -17,9 +18,13 @@ def iter_walk(walk):
 
 
 
-print('Enter file name:')
-in_filename = input()
-out_filename = "modified_" + in_filename
+if len(sys.argv) > 1:
+    in_filename = sys.argv[1]
+else:
+    print('Enter file name:')
+    in_filename = input()
+
+out_filename = "revised_" + in_filename
 
 with open(in_filename, 'r') as f_in, open(out_filename, 'w') as f_out:
 
@@ -93,11 +98,9 @@ with open(in_filename, 'r') as f_in, open(out_filename, 'w') as f_out:
                 j += 1
 
         if buffer_walk_steps:
-            #new_walk_steps.extend(buffer_walk_steps)
             for m in buffer_walk_steps:
                 f_out.write(f"{m[0]}{m[1]}")
         if step_walk is not None:
-            #new_walk_steps.append(step_walk)
             f_out.write(f"{step_walk[0]}{step_walk[1]}")
 
         new_walk = "".join(f"{orientation}{segment}" for orientation, segment in iterator_walk)
