@@ -25,12 +25,16 @@ with open(in_filename, 'r') as f_in, open(out_filename, 'w') as f_out:
 
     ref = write_graph_lines_and_get_ref(f_in, f_out)
     f_out.write(ref)
-    ref_steps = [(m[0], int(m[1:])) for m in re.findall(r'[<>]\d+', ref)]
+    ref_orientations = []
+    ref_steps = []
+    ref_desc, ref_walk = ref.rstrip('\r\n').rsplit("\t", 1)
+    for orientation, segment in iter_walk(ref_walk):
+        ref_orientations.append(orientation)
+        ref_steps.append(segment)
     del ref
 
     for line in f_in:
 
-        #new_walk_steps = [] 
         buffer_walk_steps = []
         description, walk = line.rstrip('\r\n').rsplit("\t", 1)
 
@@ -53,15 +57,13 @@ with open(in_filename, 'r') as f_in, open(out_filename, 'w') as f_out:
         while k < len(ref_steps):
             
             
-            if ref_steps[k][1] == step_walk[1]:
+            if ref_steps[k] == step_walk[1]:
                 
                 if start_k is not None and (k > start_k + 1 or j > start_j + 1):
-                    #new_walk_steps.extend(ref_steps[start_k + 1 : k])
-                    for m in ref_steps[start_k + 1 : k]:
+                    for m in zip(ref_orientations[start_k + 1 : k],ref_steps[start_k + 1 : k]):
                         f_out.write(f"{m[0]}{m[1]}")
                     buffer_walk_steps = []
                 
-                #new_walk_steps.append(step_walk)
                 f_out.write(f"{step_walk[0]}{step_walk[1]}")
 
                 start_k = k
@@ -75,11 +77,10 @@ with open(in_filename, 'r') as f_in, open(out_filename, 'w') as f_out:
                     break
                 j += 1
                 
-            elif ref_steps[k][1] < step_walk[1]:
+            elif ref_steps[k] < step_walk[1]:
                 k += 1
             else:
                 if start_k is None:
-                    #new_walk_steps.append(step_walk)
                     f_out.write(f"{step_walk[0]}{step_walk[1]}")
 
                 else:
