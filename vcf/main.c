@@ -79,11 +79,33 @@ int main(int argc, char **argv) {
         if (!rec)
             continue;
         bcf_unpack(rec, BCF_UN_ALL);
+
+        int32_t *gt_arr = NULL;
+        int ngt_arr = 0;
+
+        ngt = bcf_get_genotypes(hdr, rec, &gt_arr, &ngt_arr);
+        if (ngt <= 0)
+            continue;
+
+
+        int max_ploidy = ngt / n_samples;
+
+        for (int i = 0; i < n_samples; i++) {
+            int32_t *gt_i = gt_arr + i * max_ploidy;
+
+            for (int j = i + 1; j < n_samples; j++) {
+
+                int32_t *gt_j = gt_arr + j * max_ploidy;
+
+                gt_cmp(gt_i, gt_j, max_ploidy);
+            }
+        }   
     }
 
 
     bcf_sr_destroy(sr);
     free(diff_matrix);
     free(data);
+    free(gt_arr);
     return 0;
 }
