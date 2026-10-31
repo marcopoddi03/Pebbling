@@ -2,66 +2,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <htslib/hts.h>
+#include <stdint.h>
 #include <htslib/synced_bcf_reader.h>
-
-
-bool gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_ploidy);
-int int_cmp(const void *a, const void *b);
-bool save_matrix(const char *filename, int *data, int n);
-
-int int_cmp(const void *a, const void *b) {
-    int int_a = *((const int *)a);
-    int int_b = *((const int *)b);
-    return (int_a > int_b) - (int_a < int_b);
-}
-
-bool save_diff_matrix(const char *filename, int *data, int n) {
-    FILE *file = fopen(filename, "wb");
-    if (!file) {
-        fprintf(stderr, "Error: could not open file\n");
-        return false;
-    }
-
-    size_t dim = (size_t)n * n;
-    size_t writed = fwrite(data, sizeof(int), dim, file);
-
-    return (writed == dim);
-}
-
-bool gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_ploidy) {
-    if (!gt_i || !gt_j || max_ploidy <= 0)
-        return false;
-    int32_t tmp_i[max_ploidy];
-    int32_t tmp_j[max_ploidy];
-    for (int k = 0; k < max_ploidy; k++) {
-
-        if (gt_i[k] == bcf_int32_vector_end)
-            tmp_i[k] = -1;
-        else if (bcf_gt_is_missing(gt_i[k]))
-            return false;
-        else
-            tmp_i[k] = bcf_gt_allele(gt_i[k]);
-
-        if (gt_j[k] == bcf_int32_vector_end)
-            tmp_j[k] = -1;
-        else if (bcf_gt_is_missing(gt_j[k]))
-            return false;
-        else
-            tmp_j[k] = bcf_gt_allele(gt_j[k]);
-
-    }
-
-    qsort(tmp_i, max_ploidy, sizeof(int32_t), int_cmp);
-    qsort(tmp_j, max_ploidy, sizeof(int32_t), int_cmp); 
-
-    for (int k = 0; k < max_ploidy; k++) {
-        if (tmp_i[k] != tmp_j[k])
-            return false;
-    }
-    
-    return true; 
-}
-
+#include "diff_matrix.h"
 
 
 int main(int argc, char **argv) {
@@ -73,68 +16,21 @@ int main(int argc, char **argv) {
 
     char *filename = argv[1];
 
-    //List of chroms
-    size_t len = 1;
-
-    for (int i = 2; i < argc; i++)
-        len += strlen(argv[i]) + (i > 2 ? 1 : 0);
-
-    char *regions = malloc(len);
+    char *regions = format_regions(argv, 2, argc);
     if (!regions)
         return 1;
 
-    regions[0] = '\0';
-
-    for (int i = 2; i < argc; i++) {
-        if (i > 2)
-            strcat(regions, ",");
-
-        strcat(regions, argv[i]);
-    }
-
-    bcf_srs_t *sr = bcf_sr_init();
+    bcf_srs_t *sr = set_reader_for_diff(filename, regions);
     if (!sr) {
-        fprintf(stderr, "Error: could not inizialize reader\n");
-        return 1;
-    }
-
-    if (bcf_sr_set_opt(sr, BCF_SR_REQUIRE_IDX)) {
-        fprintf(stderr, "Error: could not recognise option\n");
-        bcf_sr_destroy(sr);
-        return 1;
-    }
-
-    if (!bcf_sr_add_reader(sr, filename)) {
-        fprintf(stderr, "Error: %s\n", bcf_sr_strerror(sr->errnum));
-        bcf_sr_destroy(sr);
-        return 1;
-    }
-
-    if (bcf_sr_set_regions(sr, regions, 0) < 0) {
-        fprintf(stderr, "Error: could not set regions\n");
-        bcf_sr_destroy(sr);
+        free(regions);
         return 1;
     }
 
     bcf_hdr_t *hdr = bcf_sr_get_header(sr, 0);
     int n_samples = bcf_hdr_nsamples(hdr);
 
-    int **diff_matrix = malloc(n_samples * sizeof(int *));
-    if (!diff_matrix) {
-        fprintf(stderr, "Error: memory allocation failed\n");
-        return 1;
-    }
-
-    int *data = calloc(n_samples * n_samples, sizeof(int));
-    if (!data) {
-        fprintf(stderr, "Error: memory allocation failed\n");
-        return 1;
-    }
-
-    for (int i = 0; i < n_samples; i++) {
-        diff_matrix[i] = data + (i * n_samples);
-    }
-
+    int **diff_matrix = init_diff_matrix(n_samples);
+    
     while (bcf_sr_next_line(sr)) {
         bcf1_t *rec = bcf_sr_get_line(sr, 0);
         if (!rec)
@@ -159,15 +55,19 @@ int main(int argc, char **argv) {
                 int32_t *gt_j = gt_arr + j * max_ploidy;
 
                 if(!gt_cmp(gt_i, gt_j, max_ploidy)) 
-                    aumentoMatrice();
+                    update_diff_matrix(diff_matrix, i, j);
             }
         } 
         free(gt_arr);  
     }
 
+    bool saved = save_diff_matrix("output.txt", diff_matrix, n_samples);
     bcf_sr_destroy(sr);
-    free(diff_matrix);
-    free(data);
+    free_diff_matrix(diff_matrix);
+    free(regions);
     
+    if(!saved)
+        return 1;
+
     return 0;
 }
