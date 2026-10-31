@@ -54,14 +54,14 @@ int main(int argc, char **argv) {
 
                 int32_t *gt_j = gt_arr + j * max_ploidy;
 
-                if(!gt_cmp(gt_i, gt_j, max_ploidy)) 
+                if(gt_cmp(gt_i, gt_j, max_ploidy) == BCF_CMP_MISMATCH) 
                     update_diff_matrix(diff_matrix, i, j);
             }
         } 
         free(gt_arr);  
     }
 
-    bool saved = save_diff_matrix("output.txt", diff_matrix, n_samples);
+    bool saved = save_diff_matrix("matrix.bin", diff_matrix, n_samples);
     bcf_sr_destroy(sr);
     free_diff_matrix(diff_matrix);
     free(regions);

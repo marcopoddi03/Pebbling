@@ -5,6 +5,7 @@
 #include <htslib/hts.h>
 #include <htslib/synced_bcf_reader.h>
 #include <htslib/vcf.h>
+#include "diff_matrix.h"
 
 
 int int_cmp(const void *a, const void *b) {
@@ -28,7 +29,7 @@ bool save_diff_matrix(const char *filename, int **matrix, int n) {
     return (writed == dim);
 }
 
-bool gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_ploidy) {
+BcfComparisonResult gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_ploidy) {
     if (!gt_i || !gt_j || max_ploidy <= 0)
         return false;
     int32_t tmp_i[max_ploidy];
@@ -38,7 +39,7 @@ bool gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_ploidy) {
         if (gt_i[k] == bcf_int32_vector_end)
             tmp_i[k] = -1;
         else if (bcf_gt_is_missing(gt_i[k]))
-            return false;
+            return BCF_CMP_MISSING_DATA;
         else
             tmp_i[k] = bcf_gt_allele(gt_i[k]);
 
@@ -56,10 +57,10 @@ bool gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_ploidy) {
 
     for (int k = 0; k < max_ploidy; k++) {
         if (tmp_i[k] != tmp_j[k])
-            return false;
+            return BCF_CMP_MISMATCH;
     }
     
-    return true; 
+    return BCF_CMP_MATCH; 
 }
 
 
@@ -153,5 +154,6 @@ bcf_srs_t *set_reader_for_diff(const char *filename, const char *regions) {
 
 
 void update_diff_matrix(int **diff_matrix, int i, int j) {
-    //da implementare
+    diff_matrix[i][j]++;
+    diff_matrix[j][i]++;
 }
