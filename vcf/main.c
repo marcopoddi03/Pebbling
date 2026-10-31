@@ -55,6 +55,25 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    bcf_hdr_t *hdr = bcf_sr_get_header(sr, 0);
+    int n_samples = bcf_hdr_nsamples(hdr);
+
+    int **diff_matrix = malloc(n_samples * sizeof(int *));
+    if (!matrix) {
+        fprintf(stderr, "Error: memory allocation failed\n");
+        return 1;
+    }
+
+    int *data = calloc(n_samples * n_samples, sizeof(int));
+    if (!data) {
+        fprintf(stderr, "Error: memory allocation failed\n");
+        return 1;
+    }
+
+    for (int i = 0; i < n_samples; i++) {
+        diff_matrix[i] = data + (i * n_samples);
+    }
+
     while (bcf_sr_next_line(sr)) {
         bcf1_t *rec = bcf_sr_get_line(sr, 0);
         if (!rec)
@@ -62,12 +81,9 @@ int main(int argc, char **argv) {
         bcf_unpack(rec, BCF_UN_ALL);
     }
 
-    
-    if (sr->errnum != bcf_sr_ok)
-        fprintf(stderr, "Errore di lettura: %s\n",
-                bcf_sr_strerror(sr->errnum));
-
 
     bcf_sr_destroy(sr);
+    free(diff_matrix);
+    free(data);
     return 0;
 }
