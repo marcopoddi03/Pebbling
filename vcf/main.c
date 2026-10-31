@@ -7,11 +7,25 @@
 
 bool gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_ploidy);
 int int_cmp(const void *a, const void *b);
+bool save_matrix(const char *filename, int *data, int n);
 
 int int_cmp(const void *a, const void *b) {
     int int_a = *((const int *)a);
     int int_b = *((const int *)b);
     return (int_a > int_b) - (int_a < int_b);
+}
+
+bool save_diff_matrix(const char *filename, int *data, int n) {
+    FILE *file = fopen(filename, "wb");
+    if (!file) {
+        fprintf(stderr, "Error: could not open file\n");
+        return false;
+    }
+
+    size_t dim = (size_t)n * n;
+    size_t writed = fwrite(data, sizeof(int), dim, file);
+
+    return (writed == dim);
 }
 
 bool gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_ploidy) {
@@ -144,12 +158,12 @@ int main(int argc, char **argv) {
 
                 int32_t *gt_j = gt_arr + j * max_ploidy;
 
-                gt_cmp(gt_i, gt_j, max_ploidy);
+                if(!gt_cmp(gt_i, gt_j, max_ploidy)) 
+                    aumentoMatrice();
             }
         } 
         free(gt_arr);  
     }
-
 
     bcf_sr_destroy(sr);
     free(diff_matrix);
