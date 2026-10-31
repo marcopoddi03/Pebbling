@@ -5,9 +5,9 @@
 #include <htslib/synced_bcf_reader.h>
 
 typedef enum {
-    GT_MATCH,            // Samples share that exact same genetic variant
-    GT_MISMATCH,         // Samples don't share that exact same genetic variant or they have a different number of haplotypes
-    GT_UNKNOWN    // Missing genotype info in at least one sample
+    GT_MATCH, // Samples share that exact same genetic variant
+    GT_MISMATCH, // Samples don't share that exact same genetic variant or they have a different number of haplotypes
+    GT_UNKNOWN // Missing genotype info in at least one sample
 } GtComparisonResult;
 
 typedef struct {

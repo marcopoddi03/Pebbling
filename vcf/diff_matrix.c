@@ -7,10 +7,10 @@
 #include <htslib/vcf.h>
 #include "diff_matrix.h"
 
-int int_cmp(const void *a, const void *b) {
-    int int_a = *((const int *)a);
-    int int_b = *((const int *)b);
-    return (int_a > int_b) - (int_a < int_b);
+int int32_t_cmp(const void *a, const void *b) {
+    int32_t x = *((const int32_t *)a);
+    int32_t y = *((const int32_t *)b);
+    return (x > y) - (x < y);
 }
 
 bool save_diff_matrix(const char *filename, DiffMatrix *diff_matrix) {
@@ -54,8 +54,8 @@ GtComparisonResult gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_ploi
 
     }
 
-    qsort(tmp_i, max_ploidy, sizeof(int32_t), int_cmp);
-    qsort(tmp_j, max_ploidy, sizeof(int32_t), int_cmp); 
+    qsort(tmp_i, max_ploidy, sizeof(int32_t), int32_t_cmp);
+    qsort(tmp_j, max_ploidy, sizeof(int32_t), int32_t_cmp); 
 
     for (int k = 0; k < max_ploidy; k++) {
         if (tmp_i[k] != tmp_j[k])
@@ -101,7 +101,13 @@ DiffMatrix *init_diff_matrix(int n_samples) {
         return NULL;
     }
 
-    int *data = calloc(n_samples * n_samples, sizeof(int));
+    if (n_samples <= 0)
+        return NULL;
+
+
+    int n = (size_t)n_samples;
+
+    int *data = calloc(n * n, sizeof(int));
     if (!data) {
         fprintf(stderr, "Error: memory allocation failed\n");
         free(matrix);
@@ -181,6 +187,8 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
     }
         
     int n_samples = bcf_hdr_nsamples(hdr);
+    if (n_samples <= 0)
+        return NULL;    
 
     DiffMatrix *diff_matrix = init_diff_matrix(n_samples);
     if(!diff_matrix) {
@@ -188,20 +196,23 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
         return NULL;
     }
 
+    int32_t *gt_arr = NULL;
+    int ngt_arr = 0;
 
     while (bcf_sr_next_line(sr)) {
         bcf1_t *rec = bcf_sr_get_line(sr, 0);
         if (!rec)
             continue;
-        bcf_unpack(rec, BCF_UN_ALL);
 
-        int32_t *gt_arr = NULL;
-        int ngt_arr = 0;
 
         int ngt = bcf_get_genotypes(hdr, rec, &gt_arr, &ngt_arr);
         if (ngt <= 0) {
             free(gt_arr);
             continue;
+        }
+
+        if (ngt % n_samples != 0) {
+            return NULL;
         }
 
         int max_ploidy = ngt / n_samples;
@@ -216,11 +227,21 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
                 if(gt_cmp(gt_i, gt_j, max_ploidy) == GT_MISMATCH) 
                     update_diff_matrix(diff_matrix, i, j);
             }
-        } 
-        free(gt_arr);  
+        }  
+    }
+
+    if (sr->errnum != 0) {
+        fprintf(stderr, "Error reading file: %s\n", bcf_sr_strerror(sr->errnum));
+
+        free(gt_arr);
+        free_diff_matrix(diff_matrix);
+        bcf_sr_destroy(sr);
+
+        return NULL;
     }
 
     bcf_sr_destroy(sr);
+    free(gt_arr); 
 
     return diff_matrix;
 }
