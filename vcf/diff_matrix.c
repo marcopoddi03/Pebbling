@@ -7,46 +7,48 @@
 #include <htslib/vcf.h>
 #include "diff_matrix.h"
 
-
 int int_cmp(const void *a, const void *b) {
     int int_a = *((const int *)a);
     int int_b = *((const int *)b);
     return (int_a > int_b) - (int_a < int_b);
 }
 
-bool save_diff_matrix(const char *filename, int **matrix, int n) {
+bool save_diff_matrix(const char *filename, DiffMatrix *diff_matrix) {
+
     FILE *file = fopen(filename, "wb");
     if (!file) {
         fprintf(stderr, "Error: could not open file\n");
         return false;
     }
 
-    size_t dim = (size_t)n * n;
-    size_t writed = fwrite(matrix[0], sizeof(int), dim, file);
+    size_t dim = (size_t)diff_matrix->n_samples * diff_matrix->n_samples;
+    size_t writed = fwrite(diff_matrix->matrix[0], sizeof(int), dim, file);
 
     fclose(file);
 
     return (writed == dim);
 }
 
-BcfComparisonResult gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_ploidy) {
+GtComparisonResult gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_ploidy) {
+
     if (!gt_i || !gt_j || max_ploidy <= 0)
-        return false;
+        return GT_UNKNOWN;
     int32_t tmp_i[max_ploidy];
     int32_t tmp_j[max_ploidy];
+
     for (int k = 0; k < max_ploidy; k++) {
 
         if (gt_i[k] == bcf_int32_vector_end)
             tmp_i[k] = -1;
         else if (bcf_gt_is_missing(gt_i[k]))
-            return BCF_CMP_MISSING_DATA;
+            return GT_UNKNOWN;
         else
             tmp_i[k] = bcf_gt_allele(gt_i[k]);
 
         if (gt_j[k] == bcf_int32_vector_end)
             tmp_j[k] = -1;
         else if (bcf_gt_is_missing(gt_j[k]))
-            return false;
+            return GT_UNKNOWN;
         else
             tmp_j[k] = bcf_gt_allele(gt_j[k]);
 
@@ -57,10 +59,10 @@ BcfComparisonResult gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_plo
 
     for (int k = 0; k < max_ploidy; k++) {
         if (tmp_i[k] != tmp_j[k])
-            return BCF_CMP_MISMATCH;
+            return GT_MISMATCH;
     }
     
-    return BCF_CMP_MATCH; 
+    return GT_MATCH; 
 }
 
 
@@ -92,12 +94,9 @@ char *format_regions(char *list[], int start_idx, int n) {
     return regions;  
 }
 
-
-
-
-int **init_diff_matrix(int n_samples) {
-    int **diff_matrix = malloc(n_samples * sizeof(int *));
-    if (!diff_matrix) {
+DiffMatrix *init_diff_matrix(int n_samples) {
+    int **matrix = malloc(n_samples * sizeof(int *));
+    if (!matrix) {
         fprintf(stderr, "Error: memory allocation failed\n");
         return NULL;
     }
@@ -105,24 +104,35 @@ int **init_diff_matrix(int n_samples) {
     int *data = calloc(n_samples * n_samples, sizeof(int));
     if (!data) {
         fprintf(stderr, "Error: memory allocation failed\n");
-        free(diff_matrix);
+        free(matrix);
+        return NULL;
+    }
+
+    DiffMatrix *diff_matrix = malloc(sizeof(DiffMatrix));
+    if (!diff_matrix) {
+        fprintf(stderr, "Error: memory allocation failed\n");
+        free(data);
+        free(matrix);
         return NULL;
     }
 
     for (int i = 0; i < n_samples; i++) {
-        diff_matrix[i] = data + (i * n_samples);
+        matrix[i] = data + (i * n_samples);
     }
+
+    diff_matrix->matrix = matrix;
+    diff_matrix->n_samples = n_samples;
 
     return diff_matrix;
 }
 
-void free_diff_matrix(int **diff_matrix) {
+void free_diff_matrix(DiffMatrix *diff_matrix) {
     if (diff_matrix) {
-        free(diff_matrix[0]);
+        free(diff_matrix->matrix[0]);
+        free(diff_matrix->matrix);
         free(diff_matrix);
     }
 }
-
 
 bcf_srs_t *set_reader_for_diff(const char *filename, const char *regions) {
     bcf_srs_t *sr = bcf_sr_init();
@@ -153,7 +163,64 @@ bcf_srs_t *set_reader_for_diff(const char *filename, const char *regions) {
 }
 
 
-void update_diff_matrix(int **diff_matrix, int i, int j) {
-    diff_matrix[i][j]++;
-    diff_matrix[j][i]++;
+void update_diff_matrix(DiffMatrix *diff_matrix, int i, int j) {
+    diff_matrix->matrix[i][j]++;
+    diff_matrix->matrix[j][i]++;
+}
+
+DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
+
+    bcf_srs_t *sr = set_reader_for_diff(filename, regions);
+    if (!sr)
+        return NULL;
+
+    bcf_hdr_t *hdr = bcf_sr_get_header(sr, 0);
+    if (!hdr) {
+        bcf_sr_destroy(sr);
+        return NULL;
+    }
+        
+    int n_samples = bcf_hdr_nsamples(hdr);
+
+    DiffMatrix *diff_matrix = init_diff_matrix(n_samples);
+    if(!diff_matrix) {
+        bcf_sr_destroy(sr);
+        return NULL;
+    }
+
+
+    while (bcf_sr_next_line(sr)) {
+        bcf1_t *rec = bcf_sr_get_line(sr, 0);
+        if (!rec)
+            continue;
+        bcf_unpack(rec, BCF_UN_ALL);
+
+        int32_t *gt_arr = NULL;
+        int ngt_arr = 0;
+
+        int ngt = bcf_get_genotypes(hdr, rec, &gt_arr, &ngt_arr);
+        if (ngt <= 0) {
+            free(gt_arr);
+            continue;
+        }
+
+        int max_ploidy = ngt / n_samples;
+
+        for (int i = 0; i < n_samples; i++) {
+            int32_t *gt_i = gt_arr + i * max_ploidy;
+
+            for (int j = i + 1; j < n_samples; j++) {
+
+                int32_t *gt_j = gt_arr + j * max_ploidy;
+
+                if(gt_cmp(gt_i, gt_j, max_ploidy) == GT_MISMATCH) 
+                    update_diff_matrix(diff_matrix, i, j);
+            }
+        } 
+        free(gt_arr);  
+    }
+
+    bcf_sr_destroy(sr);
+
+    return diff_matrix;
 }
