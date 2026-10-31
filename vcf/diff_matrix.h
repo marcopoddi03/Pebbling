@@ -24,4 +24,5 @@ void free_diff_matrix(DiffMatrix *diff_matrix);
 bcf_srs_t *set_reader_for_diff(const char *filename, const char *regions);
 void update_diff_matrix(DiffMatrix *diff_matrix, int i, int j);
 DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions);
+
 #endif 

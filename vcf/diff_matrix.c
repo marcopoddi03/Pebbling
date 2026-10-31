@@ -133,11 +133,16 @@ DiffMatrix *init_diff_matrix(int n_samples) {
 }
 
 void free_diff_matrix(DiffMatrix *diff_matrix) {
-    if (diff_matrix) {
+    
+    if (!diff_matrix)
+     return;
+
+    if (diff_matrix->matrix) {
         free(diff_matrix->matrix[0]);
         free(diff_matrix->matrix);
-        free(diff_matrix);
     }
+
+    free(diff_matrix);
 }
 
 bcf_srs_t *set_reader_for_diff(const char *filename, const char *regions) {
@@ -207,7 +212,6 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
 
         int ngt = bcf_get_genotypes(hdr, rec, &gt_arr, &ngt_arr);
         if (ngt <= 0) {
-            free(gt_arr);
             continue;
         }
 
