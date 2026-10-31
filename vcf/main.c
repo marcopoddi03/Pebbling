@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
     int n_samples = bcf_hdr_nsamples(hdr);
 
     int **diff_matrix = malloc(n_samples * sizeof(int *));
-    if (!matrix) {
+    if (!diff_matrix) {
         fprintf(stderr, "Error: memory allocation failed\n");
         return 1;
     }
@@ -130,7 +130,7 @@ int main(int argc, char **argv) {
         int32_t *gt_arr = NULL;
         int ngt_arr = 0;
 
-        ngt = bcf_get_genotypes(hdr, rec, &gt_arr, &ngt_arr);
+        int ngt = bcf_get_genotypes(hdr, rec, &gt_arr, &ngt_arr);
         if (ngt <= 0)
             continue;
 
@@ -146,13 +146,14 @@ int main(int argc, char **argv) {
 
                 gt_cmp(gt_i, gt_j, max_ploidy);
             }
-        }   
+        } 
+        free(gt_arr);  
     }
 
 
     bcf_sr_destroy(sr);
     free(diff_matrix);
     free(data);
-    free(gt_arr);
+    
     return 0;
 }
