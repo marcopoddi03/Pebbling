@@ -29,41 +29,34 @@ bool save_diff_matrix(const char *filename, DiffMatrix *diff_matrix) {
     return (writed == dim);
 }
 
-GtComparisonResult gt_cmp(const GenotypeInfo *gt_i, const GenotypeInfo *gt_j, int max_ploidy) {
+GtComparisonResult gt_cmp(const GenotypeInfo *gt_i, const GenotypeInfo *gt_j, int n_allele) {
 
-    /*if (!gt_i || !gt_j || max_ploidy <= 0)
+    if (!gt_i || !gt_j || n_allele <= 0)
         return GT_UNKNOWN;
-    int32_t tmp_i[max_ploidy];
-    int32_t tmp_j[max_ploidy];
 
-    for (int k = 0; k < max_ploidy; k++) {
+    if (gt_i->ploidy != gt_j->ploidy)
+        return GT_MISMATCH;
 
-        if (gt_i[k] == bcf_int32_vector_end)
-            tmp_i[k] = -1;
-        else if (bcf_gt_is_missing(gt_i[k]))
+    int required = 0;
+
+    for (int k = 0; k < n_allele; k++) {
+        int a1 = gt_i->allele_counts[k];
+        int a2 = gt_j->allele_counts[k];
+
+        if (a1 < 0 || a2 < 0)
             return GT_UNKNOWN;
-        else
-            tmp_i[k] = bcf_gt_allele(gt_i[k]);
 
-        if (gt_j[k] == bcf_int32_vector_end)
-            tmp_j[k] = -1;
-        else if (bcf_gt_is_missing(gt_j[k]))
-            return GT_UNKNOWN;
-        else
-            tmp_j[k] = bcf_gt_allele(gt_j[k]);
-
+        required += (a1 > a2) ? a1 : a2;
     }
 
-    qsort(tmp_i, max_ploidy, sizeof(int32_t), int32_t_cmp);
-    qsort(tmp_j, max_ploidy, sizeof(int32_t), int32_t_cmp); 
+    if (required > gt_i->ploidy)
+        return GT_MISMATCH;
 
-    for (int k = 0; k < max_ploidy; k++) {
-        if (tmp_i[k] != tmp_j[k])
-            return GT_MISMATCH;
+    if (gt_i->missing_count > 0 || gt_j->missing_count > 0) {
+        return GT_UNKNOWN;
     }
-    
+
     return GT_MATCH; 
-    */
 }
 
 
@@ -253,10 +246,7 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
 
         for (int i = 0; i < n_samples; i++) {
             for (int j = i + 1; j < n_samples; j++) {
-
-                int32_t *gt_j = gt_arr + j * max_ploidy;
-
-                if(gt_cmp(gt_info[i], gt_info[j], max_ploidy) == GT_MISMATCH) 
+                if(gt_cmp(gt_info[i], gt_info[j], n_allele) == GT_MISMATCH) 
                     update_diff_matrix(diff_matrix, i, j);
             }
 
