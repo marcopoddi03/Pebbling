@@ -13,7 +13,7 @@ int int32_t_cmp(const void *a, const void *b) {
     return (x > y) - (x < y);
 }
 
-bool save_diff_matrix(const char *filename, DiffMatrix *diff_matrix) {
+bool save_diff_matrix_bin(const char *filename, DiffMatrix *diff_matrix) {
 
     FILE *file = fopen(filename, "wb");
     if (!file) {
@@ -27,6 +27,32 @@ bool save_diff_matrix(const char *filename, DiffMatrix *diff_matrix) {
     fclose(file);
 
     return (writed == dim);
+}
+
+bool save_diff_matrix_txt(const char *filename, DiffMatrix *diff_matrix) {
+
+    FILE *file = fopen(filename, "w");
+    if (!file) {
+        fprintf(stderr, "Error: could not open file\n");
+        return false;
+    }
+
+    int n = diff_matrix->n_samples;
+
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            fprintf(file, "%d", diff_matrix->matrix[i][j]);
+
+            if (j < n - 1) {
+                fprintf(file, " ");
+            }
+        }
+        fprintf(file, "\n");
+    }
+
+    fclose(file);
+
+    return true;
 }
 
 GtComparisonResult gt_cmp(const GenotypeInfo *gt_i, const GenotypeInfo *gt_j, int n_allele) {

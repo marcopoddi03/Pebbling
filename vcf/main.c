@@ -5,26 +5,27 @@
 
 
 int main(int argc, char **argv) {
-    if (argc < 3) {
-        fprintf(stderr, "Usage: %s <file.vcf.gz> <chr1> [chr2 chr3 ...]\n", argv[0]);
+    if (argc < 4) {
+        fprintf(stderr, "Usage: %s <file_in.vcf.gz> <file_out.vcf.gz> <chr1> [chr2 chr3 ...]\n", argv[0]);
         fprintf(stderr, "Example: %s data.vcf.gz chr3 chr8 chr15 chr19 chr21\n", argv[0]);
         return 1;
     }
 
-    char *filename = argv[1];
+    char *filename_in = argv[1];
+    char *filename_out= argv[2];
 
-    char *regions = format_regions(argv, 2, argc);
+    char *regions = format_regions(argv, 3, argc);
     if (!regions)
         return 1;
 
-    DiffMatrix *diff_matrix = get_bcf_diff_matrix(filename, regions);
+    DiffMatrix *diff_matrix = get_bcf_diff_matrix(filename_in, regions);
 
     if (!diff_matrix) {
         free(regions);
         return 1;
     }
 
-    bool saved = save_diff_matrix("matrix.bin", diff_matrix);
+    bool saved = save_diff_matrix_txt(filename_out, diff_matrix);
 
     free_diff_matrix(diff_matrix);
     free(regions);

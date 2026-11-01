@@ -23,7 +23,8 @@ typedef struct {
 
 GtComparisonResult gt_cmp(const GenotypeInfo *gt_i, const GenotypeInfo *gt_j, int n_allele);
 int int_cmp(const void *a, const void *b);
-bool save_diff_matrix(const char *filename, DiffMatrix *diff_matrix);
+bool save_diff_matrix_bin(const char *filename, DiffMatrix *diff_matrix);
+bool save_diff_matrix_txt(const char *filename, DiffMatrix *diff_matrix);
 DiffMatrix *init_diff_matrix(int n_samples);
 char *format_regions(char *list[], int start_idx, int n);
 void free_diff_matrix(DiffMatrix *diff_matrix);
