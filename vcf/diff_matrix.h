@@ -2,12 +2,13 @@
 #define DIFF_MATRIX_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <htslib/synced_bcf_reader.h>
 
 typedef enum {
-    GT_MATCH, // Samples share that exact same genetic variant
-    GT_MISMATCH, // Samples don't share that exact same genetic variant or they have a different number of haplotypes
-    GT_UNKNOWN // Missing genotype info in at least one sample
+    GT_MATCH,
+    GT_MISMATCH,
+    GT_UNKNOWN 
 } GtComparisonResult;
 
 typedef struct {
@@ -22,7 +23,6 @@ typedef struct {
 } DiffMatrix;
 
 GtComparisonResult gt_cmp(const GenotypeInfo *gt_i, const GenotypeInfo *gt_j, int n_allele);
-int int_cmp(const void *a, const void *b);
 bool save_diff_matrix_bin(const char *filename, DiffMatrix *diff_matrix);
 bool save_diff_matrix_txt(const char *filename, DiffMatrix *diff_matrix);
 DiffMatrix *init_diff_matrix(int n_samples);

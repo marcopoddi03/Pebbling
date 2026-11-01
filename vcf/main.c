@@ -6,7 +6,7 @@
 
 int main(int argc, char **argv) {
     if (argc < 4) {
-        fprintf(stderr, "Usage: %s <file_in.vcf.gz> <file_out.vcf.gz> <chr1> [chr2 chr3 ...]\n", argv[0]);
+        fprintf(stderr, "Usage: %s <file_in.vcf.gz> <matrix_out.txt> <chr1> [chr2 chr3 ...]\n", argv[0]);
         fprintf(stderr, "Example: %s data.vcf.gz chr3 chr8 chr15 chr19 chr21\n", argv[0]);
         return 1;
     }

@@ -2,203 +2,11 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <htslib/hts.h>
 #include <htslib/synced_bcf_reader.h>
-#include <htslib/vcf.h>
+#include <string.h>
 #include "diff_matrix.h"
 
-int int32_t_cmp(const void *a, const void *b) {
-    int32_t x = *((const int32_t *)a);
-    int32_t y = *((const int32_t *)b);
-    return (x > y) - (x < y);
-}
-
-bool save_diff_matrix_bin(const char *filename, DiffMatrix *diff_matrix) {
-
-    FILE *file = fopen(filename, "wb");
-    if (!file) {
-        fprintf(stderr, "Error: could not open file\n");
-        return false;
-    }
-
-    size_t dim = (size_t)diff_matrix->n_samples * diff_matrix->n_samples;
-    size_t writed = fwrite(diff_matrix->matrix[0], sizeof(int), dim, file);
-
-    fclose(file);
-
-    return (writed == dim);
-}
-
-bool save_diff_matrix_txt(const char *filename, DiffMatrix *diff_matrix) {
-
-    FILE *file = fopen(filename, "w");
-    if (!file) {
-        fprintf(stderr, "Error: could not open file\n");
-        return false;
-    }
-
-    int n = diff_matrix->n_samples;
-
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            fprintf(file, "%d", diff_matrix->matrix[i][j]);
-
-            if (j < n - 1) {
-                fprintf(file, " ");
-            }
-        }
-        fprintf(file, "\n");
-    }
-
-    fclose(file);
-
-    return true;
-}
-
-GtComparisonResult gt_cmp(const GenotypeInfo *gt_i, const GenotypeInfo *gt_j, int n_allele) {
-
-    if (!gt_i || !gt_j || n_allele <= 0)
-        return GT_UNKNOWN;
-
-    if (gt_i->ploidy != gt_j->ploidy)
-        return GT_MISMATCH;
-
-    int required = 0;
-
-    for (int k = 0; k < n_allele; k++) {
-        int a1 = gt_i->allele_counts[k];
-        int a2 = gt_j->allele_counts[k];
-
-        if (a1 < 0 || a2 < 0)
-            return GT_UNKNOWN;
-
-        required += (a1 > a2) ? a1 : a2;
-    }
-
-    if (required > gt_i->ploidy)
-        return GT_MISMATCH;
-
-    if (gt_i->missing_count > 0 || gt_j->missing_count > 0) {
-        return GT_UNKNOWN;
-    }
-
-    return GT_MATCH; 
-}
-
-
-char *format_regions(char *list[], int start_idx, int n) {
-    if (start_idx >= n) {
-        char *empty = malloc(1);
-        if (empty) 
-            empty[0] = '\0';
-        return empty;
-    }
-    size_t len = 1; 
-    for (int i = start_idx; i < n; i++)
-        len += strlen(list[i]) + (i > start_idx ? 1 : 0);
-    char *regions = malloc(len);
-    if (!regions) {
-        fprintf(stderr, "Error: memory allocation failed\n");
-        return NULL;
-    }
-
-    regions[0] = '\0';
-
-    for (int i = start_idx; i < n; i++) {
-        if (i > start_idx)
-            strcat(regions, ",");
-
-        strcat(regions, list[i]);
-    }
-
-    return regions;  
-}
-
-DiffMatrix *init_diff_matrix(int n_samples) {
-    int **matrix = malloc(n_samples * sizeof(int *));
-    if (!matrix) {
-        fprintf(stderr, "Error: memory allocation failed\n");
-        return NULL;
-    }
-
-    if (n_samples <= 0)
-        return NULL;
-
-
-    int n = (size_t)n_samples;
-
-    int *data = calloc(n * n, sizeof(int));
-    if (!data) {
-        fprintf(stderr, "Error: memory allocation failed\n");
-        free(matrix);
-        return NULL;
-    }
-
-    DiffMatrix *diff_matrix = malloc(sizeof(DiffMatrix));
-    if (!diff_matrix) {
-        fprintf(stderr, "Error: memory allocation failed\n");
-        free(data);
-        free(matrix);
-        return NULL;
-    }
-
-    for (int i = 0; i < n_samples; i++) {
-        matrix[i] = data + (i * n_samples);
-    }
-
-    diff_matrix->matrix = matrix;
-    diff_matrix->n_samples = n_samples;
-
-    return diff_matrix;
-}
-
-void free_diff_matrix(DiffMatrix *diff_matrix) {
-    
-    if (!diff_matrix)
-     return;
-
-    if (diff_matrix->matrix) {
-        free(diff_matrix->matrix[0]);
-        free(diff_matrix->matrix);
-    }
-
-    free(diff_matrix);
-}
-
-bcf_srs_t *set_reader_for_diff(const char *filename, const char *regions) {
-    bcf_srs_t *sr = bcf_sr_init();
-    if (!sr) {
-        fprintf(stderr, "Error: could not inizialize reader\n");
-        return NULL;
-    }
-
-    if (bcf_sr_set_opt(sr, BCF_SR_REQUIRE_IDX)) {
-        fprintf(stderr, "Error: could not recognise option\n");
-        bcf_sr_destroy(sr);
-        return NULL;
-    }
-
-    if (!bcf_sr_add_reader(sr, filename)) {
-        fprintf(stderr, "Error: %s\n", bcf_sr_strerror(sr->errnum));
-        bcf_sr_destroy(sr);
-        return NULL;
-    }
-
-    if (bcf_sr_set_regions(sr, regions, 0) < 0) {
-        fprintf(stderr, "Error: could not set regions\n");
-        bcf_sr_destroy(sr);
-        return NULL;
-    }
-
-    return sr;
-}
-
-
-void update_diff_matrix(DiffMatrix *diff_matrix, int i, int j) {
-    diff_matrix->matrix[i][j]++;
-    diff_matrix->matrix[j][i]++;
-}
-
+// Main function
 DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
 
     bcf_srs_t *sr = set_reader_for_diff(filename, regions);
@@ -248,6 +56,7 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
             free(gt_arr);
             free_diff_matrix(diff_matrix);
             bcf_sr_destroy(sr);
+            free(gt_info);
             return NULL;
         }
 
@@ -265,6 +74,8 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
                 }
                 free_diff_matrix(diff_matrix);
                 bcf_sr_destroy(sr);
+                free(gt_info);
+                free(gt_arr);
                 return NULL;
             }
         }
@@ -291,7 +102,7 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
         free(gt_arr);
         free_diff_matrix(diff_matrix);
         bcf_sr_destroy(sr);
-
+        free(gt_info);
         return NULL;
     }
 
@@ -300,6 +111,40 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
     free(gt_info);
 
     return diff_matrix;
+}
+
+
+
+// Genotype functions
+
+GtComparisonResult gt_cmp(const GenotypeInfo *gt_i, const GenotypeInfo *gt_j, int n_allele) {
+
+    if (!gt_i || !gt_j || n_allele <= 0)
+        return GT_UNKNOWN;
+
+    if (gt_i->ploidy != gt_j->ploidy)
+        return GT_MISMATCH;
+
+    int required = 0;
+
+    for (int k = 0; k < n_allele; k++) {
+        int a1 = gt_i->allele_counts[k];
+        int a2 = gt_j->allele_counts[k];
+
+        if (a1 < 0 || a2 < 0)
+            return GT_UNKNOWN;
+
+        required += (a1 > a2) ? a1 : a2;
+    }
+
+    if (required > gt_i->ploidy)
+        return GT_MISMATCH;
+
+    if (gt_i->missing_count > 0 || gt_j->missing_count > 0) {
+        return GT_UNKNOWN;
+    }
+
+    return GT_MATCH; 
 }
 
 GenotypeInfo *get_genotype_info(const int32_t *gt, int max_ploidy, int n_allele) {
@@ -355,4 +200,165 @@ void free_genotype_info(GenotypeInfo *gt_info) {
         return;
     free(gt_info->allele_counts);
     free(gt_info);
+}
+
+
+
+// Matrix functions
+
+DiffMatrix *init_diff_matrix(int n_samples) {
+    if (n_samples <= 0)
+        return NULL;
+
+    int **matrix = malloc(n_samples * sizeof(int *));
+    if (!matrix) {
+        fprintf(stderr, "Error: memory allocation failed\n");
+        return NULL;
+    }
+
+    size_t n = (size_t)n_samples;
+
+    int *data = calloc(n * n, sizeof(int));
+    if (!data) {
+        fprintf(stderr, "Error: memory allocation failed\n");
+        free(matrix);
+        return NULL;
+    }
+
+    DiffMatrix *diff_matrix = malloc(sizeof(DiffMatrix));
+    if (!diff_matrix) {
+        fprintf(stderr, "Error: memory allocation failed\n");
+        free(data);
+        free(matrix);
+        return NULL;
+    }
+
+    for (int i = 0; i < n_samples; i++) {
+        matrix[i] = data + (i * n_samples);
+    }
+
+    diff_matrix->matrix = matrix;
+    diff_matrix->n_samples = n_samples;
+
+    return diff_matrix;
+}
+
+void free_diff_matrix(DiffMatrix *diff_matrix) {
+    
+    if (!diff_matrix)
+     return;
+
+    if (diff_matrix->matrix) {
+        free(diff_matrix->matrix[0]);
+        free(diff_matrix->matrix);
+    }
+
+    free(diff_matrix);
+}
+
+void update_diff_matrix(DiffMatrix *diff_matrix, int i, int j) {
+    diff_matrix->matrix[i][j]++;
+    diff_matrix->matrix[j][i]++;
+}
+
+bool save_diff_matrix_bin(const char *filename, DiffMatrix *diff_matrix) {
+
+    FILE *file = fopen(filename, "wb");
+    if (!file) {
+        fprintf(stderr, "Error: could not open file\n");
+        return false;
+    }
+
+    size_t dim = (size_t)diff_matrix->n_samples * diff_matrix->n_samples;
+    size_t writed = fwrite(diff_matrix->matrix[0], sizeof(int), dim, file);
+
+    fclose(file);
+
+    return (writed == dim);
+}
+
+bool save_diff_matrix_txt(const char *filename, DiffMatrix *diff_matrix) {
+
+    FILE *file = fopen(filename, "w");
+    if (!file) {
+        fprintf(stderr, "Error: could not open file\n");
+        return false;
+    }
+
+    int n = diff_matrix->n_samples;
+
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            fprintf(file, "%d", diff_matrix->matrix[i][j]);
+
+            if (j < n - 1) {
+                fprintf(file, " ");
+            }
+        }
+        fprintf(file, "\n");
+    }
+
+    fclose(file);
+
+    return true;
+}
+
+
+
+// Others
+
+char *format_regions(char *list[], int start_idx, int n) {
+    if (start_idx >= n) {
+        char *empty = malloc(1);
+        if (empty) 
+            empty[0] = '\0';
+        return empty;
+    }
+    size_t len = 1; 
+    for (int i = start_idx; i < n; i++)
+        len += strlen(list[i]) + (i > start_idx ? 1 : 0);
+    char *regions = malloc(len);
+    if (!regions) {
+        fprintf(stderr, "Error: memory allocation failed\n");
+        return NULL;
+    }
+
+    regions[0] = '\0';
+
+    for (int i = start_idx; i < n; i++) {
+        if (i > start_idx)
+            strcat(regions, ",");
+
+        strcat(regions, list[i]);
+    }
+
+    return regions;  
+}
+
+bcf_srs_t *set_reader_for_diff(const char *filename, const char *regions) {
+    bcf_srs_t *sr = bcf_sr_init();
+    if (!sr) {
+        fprintf(stderr, "Error: could not inizialize reader\n");
+        return NULL;
+    }
+
+    if (bcf_sr_set_opt(sr, BCF_SR_REQUIRE_IDX)) {
+        fprintf(stderr, "Error: could not recognise option\n");
+        bcf_sr_destroy(sr);
+        return NULL;
+    }
+
+    if (!bcf_sr_add_reader(sr, filename)) {
+        fprintf(stderr, "Error: %s\n", bcf_sr_strerror(sr->errnum));
+        bcf_sr_destroy(sr);
+        return NULL;
+    }
+
+    if (bcf_sr_set_regions(sr, regions, 0) < 0) {
+        fprintf(stderr, "Error: could not set regions\n");
+        bcf_sr_destroy(sr);
+        return NULL;
+    }
+
+    return sr;
 }
