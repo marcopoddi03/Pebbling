@@ -11,11 +11,17 @@ typedef enum {
 } GtComparisonResult;
 
 typedef struct {
+    int *allele_counts;
+    int ploidy;
+    int missing_count;
+} GenotypeInfo;
+
+typedef struct {
     int **matrix;
     int n_samples;
 } DiffMatrix;
 
-GtComparisonResult gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_ploidy);
+GtComparisonResult gt_cmp(const GenotypeInfo *gt_i, const GenotypeInfo *gt_j, int max_ploidy);
 int int_cmp(const void *a, const void *b);
 bool save_diff_matrix(const char *filename, DiffMatrix *diff_matrix);
 DiffMatrix *init_diff_matrix(int n_samples);
@@ -24,5 +30,7 @@ void free_diff_matrix(DiffMatrix *diff_matrix);
 bcf_srs_t *set_reader_for_diff(const char *filename, const char *regions);
 void update_diff_matrix(DiffMatrix *diff_matrix, int i, int j);
 DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions);
+void free_genotype_info(GenotypeInfo *gt_info);
+GenotypeInfo *get_genotype_info(const int32_t *gt, int max_ploidy, int n_allele);
 
 #endif 

@@ -29,9 +29,9 @@ bool save_diff_matrix(const char *filename, DiffMatrix *diff_matrix) {
     return (writed == dim);
 }
 
-GtComparisonResult gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_ploidy) {
+GtComparisonResult gt_cmp(const GenotypeInfo *gt_i, const GenotypeInfo *gt_j, int max_ploidy) {
 
-    if (!gt_i || !gt_j || max_ploidy <= 0)
+    /*if (!gt_i || !gt_j || max_ploidy <= 0)
         return GT_UNKNOWN;
     int32_t tmp_i[max_ploidy];
     int32_t tmp_j[max_ploidy];
@@ -63,6 +63,7 @@ GtComparisonResult gt_cmp(const int32_t *gt_i, const int32_t *gt_j, int max_ploi
     }
     
     return GT_MATCH; 
+    */
 }
 
 
@@ -193,7 +194,10 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
         
     int n_samples = bcf_hdr_nsamples(hdr);
     if (n_samples <= 0)
-        return NULL;    
+    {
+        bcf_sr_destroy(sr);
+        return NULL;
+    } 
 
     DiffMatrix *diff_matrix = init_diff_matrix(n_samples);
     if(!diff_matrix) {
@@ -204,11 +208,17 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
     int32_t *gt_arr = NULL;
     int ngt_arr = 0;
 
+    GenotypeInfo **gt_info = malloc((size_t)n_samples * sizeof(*gt_info));
+    if (!gt_info) {
+        free_diff_matrix(diff_matrix);
+        bcf_sr_destroy(sr);
+        return NULL;
+    }
+
     while (bcf_sr_next_line(sr)) {
         bcf1_t *rec = bcf_sr_get_line(sr, 0);
         if (!rec)
             continue;
-
 
         int ngt = bcf_get_genotypes(hdr, rec, &gt_arr, &ngt_arr);
         if (ngt <= 0) {
@@ -216,22 +226,47 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
         }
 
         if (ngt % n_samples != 0) {
+            free(gt_arr);
+            free_diff_matrix(diff_matrix);
+            bcf_sr_destroy(sr);
             return NULL;
         }
 
         int max_ploidy = ngt / n_samples;
+        int n_allele = rec->n_allele;
+
+
+        for (int k = 0; k < n_samples; k++) {
+            int32_t *gt_k = gt_arr + k * max_ploidy;
+            gt_info[k] = get_genotype_info(gt_k, max_ploidy, n_allele);
+
+            if (!gt_info[k]) {
+                for (int j = 0; j < k; j++) {
+                    free_genotype_info(gt_info[j]);
+                }
+                free_diff_matrix(diff_matrix);
+                bcf_sr_destroy(sr);
+                return NULL;
+            }
+        }
+
 
         for (int i = 0; i < n_samples; i++) {
-            int32_t *gt_i = gt_arr + i * max_ploidy;
-
             for (int j = i + 1; j < n_samples; j++) {
 
                 int32_t *gt_j = gt_arr + j * max_ploidy;
 
-                if(gt_cmp(gt_i, gt_j, max_ploidy) == GT_MISMATCH) 
+                if(gt_cmp(gt_info[i], gt_info[j], max_ploidy) == GT_MISMATCH) 
                     update_diff_matrix(diff_matrix, i, j);
             }
+
         }  
+
+        for (int k=0; k < n_samples; k++) {
+            free_genotype_info(gt_info[k]);
+            gt_info[k] = NULL;
+        }
+
     }
 
     if (sr->errnum != 0) {
@@ -246,6 +281,62 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
 
     bcf_sr_destroy(sr);
     free(gt_arr); 
+    free(gt_info);
 
     return diff_matrix;
+}
+
+GenotypeInfo *get_genotype_info(const int32_t *gt, int max_ploidy, int n_allele) {
+    if (!gt || max_ploidy <= 0 || n_allele <= 0)
+        return NULL;
+
+    GenotypeInfo *gt_info = malloc(sizeof(*gt_info));
+    if (!gt_info)
+        return NULL;
+
+    int *allele_counts = calloc((size_t)n_allele, sizeof(int));
+
+    if (!allele_counts) {
+        free(gt_info);
+        return NULL;
+    }
+
+    int missing_count = 0;
+    int ploidy = 0;
+
+    for (int k = 0; k < max_ploidy; k++) {
+
+        if (gt[k] == bcf_int32_vector_end)
+            break;
+
+        ploidy++;
+
+        if (bcf_gt_is_missing(gt[k])) {
+            missing_count++;
+            continue;
+        }
+
+        int allele = bcf_gt_allele(gt[k]);
+
+        if (allele < 0 || allele >= n_allele) {
+            free(allele_counts);
+            free(gt_info);
+            return NULL;
+        }
+
+        allele_counts[allele]++;
+    }
+
+    gt_info->allele_counts = allele_counts;
+    gt_info->missing_count = missing_count;
+    gt_info->ploidy = ploidy;
+
+    return gt_info;
+}
+
+void free_genotype_info(GenotypeInfo *gt_info) {
+    if (!gt_info)
+        return;
+    free(gt_info->allele_counts);
+    free(gt_info);
 }
