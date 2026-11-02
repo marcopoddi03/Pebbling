@@ -19,18 +19,19 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
         return NULL;
     }
         
+
+    DiffMatrix *diff_matrix = init_diff_matrix(hdr);
+    if(!diff_matrix) {
+        bcf_sr_destroy(sr);
+        return NULL;
+    }
+
     int n_samples = bcf_hdr_nsamples(hdr);
     if (n_samples <= 0)
     {
         bcf_sr_destroy(sr);
         return NULL;
     } 
-
-    DiffMatrix *diff_matrix = init_diff_matrix(n_samples);
-    if(!diff_matrix) {
-        bcf_sr_destroy(sr);
-        return NULL;
-    }
 
     int32_t *gt_arr = NULL;
     int ngt_arr = 0;
@@ -63,7 +64,6 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
         int max_ploidy = ngt / n_samples;
         int n_allele = rec->n_allele;
 
-
         for (int k = 0; k < n_samples; k++) {
             int32_t *gt_k = gt_arr + k * max_ploidy;
             gt_info[k] = get_genotype_info(gt_k, max_ploidy, n_allele);
@@ -79,7 +79,6 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
                 return NULL;
             }
         }
-
 
         for (int i = 0; i < n_samples; i++) {
             for (int j = i + 1; j < n_samples; j++) {
@@ -206,8 +205,12 @@ void free_genotype_info(GenotypeInfo *gt_info) {
 
 // Matrix functions
 
-DiffMatrix *init_diff_matrix(int n_samples) {
-    if (n_samples <= 0)
+DiffMatrix *init_diff_matrix(const bcf_hdr_t *hdr) {
+    if (!hdr || !hdr->samples)
+        return NULL;
+
+    int n_samples = bcf_hdr_nsamples(hdr);
+    if (n_samples <=0)
         return NULL;
 
     int **matrix = malloc(n_samples * sizeof(int *));
@@ -233,12 +236,34 @@ DiffMatrix *init_diff_matrix(int n_samples) {
         return NULL;
     }
 
+    char **samples = malloc(n_samples * sizeof(char *));
+    if(!samples) {
+        fprintf(stderr, "Error: memory allocation failed\n");
+        free(data);
+        free(matrix);
+        free(diff_matrix);
+        return NULL;
+    }
+
     for (int i = 0; i < n_samples; i++) {
         matrix[i] = data + (i * n_samples);
+
+        samples[i] = strdup(hdr->samples[i]);
+        if (!samples[i]) {
+            fprintf(stderr, "Error: memory allocation failed\n");
+            for (int j = 0; j < i; j++)
+                free(samples[j]);
+            free(data);
+            free(matrix);
+            free(diff_matrix);
+            free(samples);
+            return NULL;
+        }
     }
 
     diff_matrix->matrix = matrix;
     diff_matrix->n_samples = n_samples;
+    diff_matrix->samples = samples;
 
     return diff_matrix;
 }
@@ -251,6 +276,12 @@ void free_diff_matrix(DiffMatrix *diff_matrix) {
     if (diff_matrix->matrix) {
         free(diff_matrix->matrix[0]);
         free(diff_matrix->matrix);
+    }
+
+    if (diff_matrix->samples) {
+        for (int i = 0; i < diff_matrix->n_samples; i++)
+            free(diff_matrix->samples[i]);
+        free(diff_matrix->samples);
     }
 
     free(diff_matrix);

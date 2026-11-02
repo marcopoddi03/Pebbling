@@ -20,12 +20,13 @@ typedef struct {
 typedef struct {
     int **matrix;
     int n_samples;
+    char **samples;
 } DiffMatrix;
 
 GtComparisonResult gt_cmp(const GenotypeInfo *gt_i, const GenotypeInfo *gt_j, int n_allele);
 bool save_diff_matrix_bin(const char *filename, DiffMatrix *diff_matrix);
 bool save_diff_matrix_txt(const char *filename, DiffMatrix *diff_matrix);
-DiffMatrix *init_diff_matrix(int n_samples);
+DiffMatrix *init_diff_matrix(const bcf_hdr_t *hdr);
 char *format_regions(char *list[], int start_idx, int n);
 void free_diff_matrix(DiffMatrix *diff_matrix);
 bcf_srs_t *set_reader_for_diff(const char *filename, const char *regions);
