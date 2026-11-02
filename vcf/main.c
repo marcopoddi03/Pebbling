@@ -25,12 +25,12 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    bool saved = save_diff_matrix_txt(filename_out, diff_matrix);
+    int saved = save_diff_matrix_txt(filename_out, diff_matrix);
 
     free_diff_matrix(diff_matrix);
     free(regions);
     
-    if(!saved)
+    if(saved)
         return 1;
 
     return 0;
