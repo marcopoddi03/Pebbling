@@ -8,7 +8,8 @@
 typedef enum {
     GT_MATCH,
     GT_MISMATCH,
-    GT_UNKNOWN 
+    GT_UNKNOWN,
+    GT_DIFF_PLOIDY 
 } GtComparisonResult;
 
 typedef struct {

@@ -125,7 +125,7 @@ GtComparisonResult gt_cmp(const GenotypeInfo *gt_i, const GenotypeInfo *gt_j, in
         return GT_UNKNOWN;
 
     if (gt_i->ploidy != gt_j->ploidy)
-        return GT_MISMATCH;
+        return GT_DIFF_PLOIDY;
 
     int required = 0;
 
