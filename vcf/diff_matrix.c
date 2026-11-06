@@ -7,9 +7,9 @@
 #include "diff_matrix.h"
 
 // Main function
-DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
+PairwiseMatrix *get_bcf_pairwise_matrix(const char *filename, char *regions) {
 
-    bcf_srs_t *sr = set_reader_for_diff(filename, regions);
+    bcf_srs_t *sr = set_reader_for_pairwise(filename, regions);
     if (!sr)
         return NULL;
 
@@ -26,8 +26,8 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
         return NULL;
     } 
 
-    DiffMatrix *diff_matrix = init_diff_matrix(hdr);
-    if(!diff_matrix) {
+    PairwiseMatrix *pairwise_matrix = init_pairwise_matrix(hdr);
+    if(!pairwise_matrix) {
         bcf_sr_destroy(sr);
         return NULL;
     }
@@ -38,7 +38,7 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
 
     GenotypeInfo **gt_info = malloc(n * sizeof(*gt_info));
     if (!gt_info) {
-        free_diff_matrix(diff_matrix);
+        free_pairwise_matrix(pairwise_matrix);
         bcf_sr_destroy(sr);
         return NULL;
     }
@@ -47,7 +47,7 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
         bcf1_t *rec = bcf_sr_get_line(sr, 0);
         if (!rec) {
             free(gt_arr);
-            free_diff_matrix(diff_matrix);
+            free_pairwise_matrix(pairwise_matrix);
             bcf_sr_destroy(sr);
             free(gt_info);
             return NULL;
@@ -60,7 +60,7 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
 
         if (ngt % n != 0) {
             free(gt_arr);
-            free_diff_matrix(diff_matrix);
+            free_pairwise_matrix(pairwise_matrix);
             bcf_sr_destroy(sr);
             free(gt_info);
             return NULL;
@@ -77,7 +77,7 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
                 for (int j = 0; j < k; j++) {
                     free_genotype_info(gt_info[j]);
                 }
-                free_diff_matrix(diff_matrix);
+                free_pairwise_matrix(pairwise_matrix);
                 bcf_sr_destroy(sr);
                 free(gt_info);
                 free(gt_arr);
@@ -88,7 +88,7 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
         for (int i = 0; i < n; i++) {
             for (int j = i + 1; j < n; j++) {
                 if(gt_cmp(gt_info[i], gt_info[j], n_allele) == GT_MISMATCH) 
-                    update_diff_matrix(diff_matrix, i, j);
+                    update_pairwise_matrix(pairwise_matrix, i, j);
             }
 
         }  
@@ -102,7 +102,7 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
 
     if (sr->errnum != 0) {
         free(gt_arr);
-        free_diff_matrix(diff_matrix);
+        free_pairwise_matrix(pairwise_matrix);
         bcf_sr_destroy(sr);
         free(gt_info);
         return NULL;
@@ -112,7 +112,7 @@ DiffMatrix *get_bcf_diff_matrix(const char *filename, char *regions) {
     free(gt_arr); 
     free(gt_info);
 
-    return diff_matrix;
+    return pairwise_matrix;
 }
 
 
@@ -208,7 +208,7 @@ void free_genotype_info(GenotypeInfo *gt_info) {
 
 // Matrix functions
 
-DiffMatrix *init_diff_matrix(const bcf_hdr_t *hdr) {
+PairwiseMatrix *init_pairwise_matrix(const bcf_hdr_t *hdr) {
     if (!hdr || !hdr->samples)
         return NULL;
 
@@ -229,8 +229,8 @@ DiffMatrix *init_diff_matrix(const bcf_hdr_t *hdr) {
         return NULL;
     }
 
-    DiffMatrix *diff_matrix = malloc(sizeof(DiffMatrix));
-    if (!diff_matrix) {
+    PairwiseMatrix *pairwise_matrix = malloc(sizeof(PairwiseMatrix));
+    if (!pairwise_matrix) {
         free(data);
         free(matrix);
         return NULL;
@@ -240,7 +240,7 @@ DiffMatrix *init_diff_matrix(const bcf_hdr_t *hdr) {
     if(!samples) {
         free(data);
         free(matrix);
-        free(diff_matrix);
+        free(pairwise_matrix);
         return NULL;
     }
 
@@ -253,63 +253,63 @@ DiffMatrix *init_diff_matrix(const bcf_hdr_t *hdr) {
                 free(samples[j]);
             free(data);
             free(matrix);
-            free(diff_matrix);
+            free(pairwise_matrix);
             free(samples);
             return NULL;
         }
     }
 
-    diff_matrix->matrix = matrix;
-    diff_matrix->pm_info.n_samples = n_samples;
-    diff_matrix->pm_info.samples = samples;
+    pairwise_matrix->matrix = matrix;
+    pairwise_matrix->pm_info.n_samples = n_samples;
+    pairwise_matrix->pm_info.samples = samples;
 
-    return diff_matrix;
+    return pairwise_matrix;
 }
 
-void free_diff_matrix(DiffMatrix *diff_matrix) {
+void free_pairwise_matrix(PairwiseMatrix *pairwise_matrix) {
     
-    if (!diff_matrix)
+    if (!pairwise_matrix)
         return;
 
-    if (diff_matrix->matrix) {
-        free(diff_matrix->matrix[0]);
-        free(diff_matrix->matrix);
+    if (pairwise_matrix->matrix) {
+        free(pairwise_matrix->matrix[0]);
+        free(pairwise_matrix->matrix);
     }
 
-    if (diff_matrix->pm_info.samples) {
-        for (size_t i = 0; i < diff_matrix->pm_info.n_samples; i++)
-            free(diff_matrix->pm_info.samples[i]);
-        free(diff_matrix->pm_info.samples);
+    if (pairwise_matrix->pm_info.samples) {
+        for (size_t i = 0; i < pairwise_matrix->pm_info.n_samples; i++)
+            free(pairwise_matrix->pm_info.samples[i]);
+        free(pairwise_matrix->pm_info.samples);
     }
 
-    free(diff_matrix);
+    free(pairwise_matrix);
 }
 
-bool update_diff_matrix(DiffMatrix *diff_matrix, int i, int j) {
+bool update_pairwise_matrix(PairwiseMatrix *pairwise_matrix, int i, int j) {
 
-    if (!diff_matrix || i < 0 || j < 0 || !diff_matrix->matrix || !diff_matrix->matrix[0])
+    if (!pairwise_matrix || i < 0 || j < 0 || !pairwise_matrix->matrix || !pairwise_matrix->matrix[0])
         return false;
 
-    size_t n = (size_t)diff_matrix->pm_info.n_samples;
+    size_t n = (size_t)pairwise_matrix->pm_info.n_samples;
     if (i >= n || j >= n)
         return false;
 
     if (i == j)
         return true;
 
-    diff_matrix->matrix[i][j]++;
-    diff_matrix->matrix[j][i]++;
+    pairwise_matrix->matrix[i][j]++;
+    pairwise_matrix->matrix[j][i]++;
 
     return true;
 }
 
-int save_diff_matrix_bin(const char *filename, DiffMatrix *diff_matrix) {
+int save_pairwise_matrix_bin(const char *filename, PairwiseMatrix *pairwise_matrix) {
 
-    if (!diff_matrix || !diff_matrix->matrix || !diff_matrix->matrix[0] || diff_matrix->pm_info.n_samples <= 0){
+    if (!pairwise_matrix || !pairwise_matrix->matrix || !pairwise_matrix->matrix[0] || pairwise_matrix->pm_info.n_samples <= 0){
         return -1;
     }
 
-    size_t n = (size_t)diff_matrix->pm_info.n_samples;
+    size_t n = (size_t)pairwise_matrix->pm_info.n_samples;
 
     FILE *file = fopen(filename, "wb");
     if (!file) {
@@ -317,7 +317,7 @@ int save_diff_matrix_bin(const char *filename, DiffMatrix *diff_matrix) {
     }
 
     size_t dim = n * n;
-    size_t writed = fwrite(diff_matrix->matrix[0], sizeof(int), dim, file);
+    size_t writed = fwrite(pairwise_matrix->matrix[0], sizeof(int), dim, file);
 
     fclose(file);
 
@@ -327,9 +327,9 @@ int save_diff_matrix_bin(const char *filename, DiffMatrix *diff_matrix) {
     return 0;  // -1 matrice non valida, -2 problema file, 0 successo
 }
 
-int save_diff_matrix_txt(const char *filename, DiffMatrix *diff_matrix) {
+int save_pairwise_matrix_txt(const char *filename, PairwiseMatrix *pairwise_matrix) {
 
-    if (!diff_matrix || !diff_matrix->matrix || !diff_matrix->matrix[0] || diff_matrix->pm_info.n_samples <= 0){
+    if (!pairwise_matrix || !pairwise_matrix->matrix || !pairwise_matrix->matrix[0] || pairwise_matrix->pm_info.n_samples <= 0){
         return -1;
     }
 
@@ -338,11 +338,11 @@ int save_diff_matrix_txt(const char *filename, DiffMatrix *diff_matrix) {
         return -2;
     }
 
-    int n = diff_matrix->pm_info.n_samples;
+    int n = pairwise_matrix->pm_info.n_samples;
 
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            fprintf(file, "%d", diff_matrix->matrix[i][j]);
+            fprintf(file, "%d", pairwise_matrix->matrix[i][j]);
 
             if (j < n - 1)
                 fprintf(file, " ");
@@ -386,7 +386,7 @@ char *format_regions(char *list[], int start_idx, int n) {
     return regions;  
 }
 
-bcf_srs_t *set_reader_for_diff(const char *filename, const char *regions) {
+bcf_srs_t *set_reader_for_pairwise(const char *filename, const char *regions) {
 
     if(!regions)
         return NULL;

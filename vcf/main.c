@@ -18,16 +18,16 @@ int main(int argc, char **argv) {
     if (!regions)
         return 1;
 
-    DiffMatrix *diff_matrix = get_bcf_diff_matrix(filename_in, regions);
+    PairwiseMatrix *pairwise_matrix = get_bcf_pairwise_matrix(filename_in, regions);
 
-    if (!diff_matrix) {
+    if (!pairwise_matrix) {
         free(regions);
         return 1;
     }
 
-    int saved = save_diff_matrix_txt(filename_out, diff_matrix);
+    int saved = save_pairwise_matrix_txt(filename_out, pairwise_matrix);
 
-    free_diff_matrix(diff_matrix);
+    free_pairwise_matrix(pairwise_matrix);
     free(regions);
     
     if(saved)
