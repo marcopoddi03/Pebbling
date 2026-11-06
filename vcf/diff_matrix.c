@@ -260,8 +260,8 @@ DiffMatrix *init_diff_matrix(const bcf_hdr_t *hdr) {
     }
 
     diff_matrix->matrix = matrix;
-    diff_matrix->n_samples = n_samples;
-    diff_matrix->samples = samples;
+    diff_matrix->pm_info.n_samples = n_samples;
+    diff_matrix->pm_info.samples = samples;
 
     return diff_matrix;
 }
@@ -276,10 +276,10 @@ void free_diff_matrix(DiffMatrix *diff_matrix) {
         free(diff_matrix->matrix);
     }
 
-    if (diff_matrix->samples) {
-        for (size_t i = 0; i < diff_matrix->n_samples; i++)
-            free(diff_matrix->samples[i]);
-        free(diff_matrix->samples);
+    if (diff_matrix->pm_info.samples) {
+        for (size_t i = 0; i < diff_matrix->pm_info.n_samples; i++)
+            free(diff_matrix->pm_info.samples[i]);
+        free(diff_matrix->pm_info.samples);
     }
 
     free(diff_matrix);
@@ -290,7 +290,7 @@ bool update_diff_matrix(DiffMatrix *diff_matrix, int i, int j) {
     if (!diff_matrix || i < 0 || j < 0 || !diff_matrix->matrix || !diff_matrix->matrix[0])
         return false;
 
-    size_t n = (size_t)diff_matrix->n_samples;
+    size_t n = (size_t)diff_matrix->pm_info.n_samples;
     if (i >= n || j >= n)
         return false;
 
@@ -305,11 +305,11 @@ bool update_diff_matrix(DiffMatrix *diff_matrix, int i, int j) {
 
 int save_diff_matrix_bin(const char *filename, DiffMatrix *diff_matrix) {
 
-    if (!diff_matrix || !diff_matrix->matrix || !diff_matrix->matrix[0] || diff_matrix->n_samples <= 0){
+    if (!diff_matrix || !diff_matrix->matrix || !diff_matrix->matrix[0] || diff_matrix->pm_info.n_samples <= 0){
         return -1;
     }
 
-    size_t n = (size_t)diff_matrix->n_samples;
+    size_t n = (size_t)diff_matrix->pm_info.n_samples;
 
     FILE *file = fopen(filename, "wb");
     if (!file) {
@@ -329,7 +329,7 @@ int save_diff_matrix_bin(const char *filename, DiffMatrix *diff_matrix) {
 
 int save_diff_matrix_txt(const char *filename, DiffMatrix *diff_matrix) {
 
-    if (!diff_matrix || !diff_matrix->matrix || !diff_matrix->matrix[0] || diff_matrix->n_samples <= 0){
+    if (!diff_matrix || !diff_matrix->matrix || !diff_matrix->matrix[0] || diff_matrix->pm_info.n_samples <= 0){
         return -1;
     }
 
@@ -338,7 +338,7 @@ int save_diff_matrix_txt(const char *filename, DiffMatrix *diff_matrix) {
         return -2;
     }
 
-    int n = diff_matrix->n_samples;
+    int n = diff_matrix->pm_info.n_samples;
 
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {

@@ -19,9 +19,13 @@ typedef struct {
 } GenotypeInfo;
 
 typedef struct {
-    int **matrix;
     int n_samples;
     char **samples;
+} PairwiseMatrixInfo;
+
+typedef struct {
+    int **matrix;
+    PairwiseMatrixInfo pm_info;
 } DiffMatrix;
 
 
