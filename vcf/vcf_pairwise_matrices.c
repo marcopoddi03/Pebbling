@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <htslib/synced_bcf_reader.h>
 #include <string.h>
-#include "diff_matrix.h"
+#include "vcf_pairwise_matrices.h"
 
 // Main function
 PairwiseMatrix *get_bcf_pairwise_matrix(const char *filename, char *regions) {

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include "diff_matrix.h"
+#include "vcf_pairwise_matrices.h"
 
 
 int main(int argc, char **argv) {

@@ -1,5 +1,5 @@
-#ifndef DIFF_MATRIX_H
-#define DIFF_MATRIX_H
+#ifndef VCF_PAIRWISE_MATRICES_H
+#define VCF_PAIRWISE_MATRICES_H
 
 #include <stdint.h>
 #include <stdbool.h>
