@@ -18,16 +18,16 @@ int main(int argc, char **argv) {
     if (!regions)
         return 1;
 
-    PairwiseMatrix *pairwise_matrix = get_bcf_pairwise_matrix(filename_in, regions);
+    PairwiseMatrices *pairwise_matrices = get_vcf_pairwise_matrices(filename_in, regions);
 
-    if (!pairwise_matrix) {
+    if (!pairwise_matrices) {
         free(regions);
         return 1;
     }
 
-    int saved = save_pairwise_matrix_txt(filename_out, pairwise_matrix);
+    int saved = save_pairwise_matrices_txt(filename_out, pairwise_matrices);
 
-    free_pairwise_matrix(pairwise_matrix);
+    free_pairwise_matrices(pairwise_matrices);
     free(regions);
     
     if(saved)
