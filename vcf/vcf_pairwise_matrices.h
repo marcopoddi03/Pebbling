@@ -24,13 +24,14 @@ typedef struct {
 } PairwiseMatrixInfo;
 
 typedef struct {
-    int **diss_matrix;
+    int **dist_matrix;
     int **sim_matrix;
     PairwiseMatrixInfo pm_info;
 } PairwiseMatrices;
 
-// Main function
+// Main functions
 PairwiseMatrices *get_vcf_pairwise_matrices(const char *filename, char *regions);
+PairwiseMatrices *easy_get_vcf_pairwise_matrices(const char *filename, char *regions);
 
 // Genotype functions
 GtComparisonResult gt_cmp(const GenotypeInfo *gt_i, const GenotypeInfo *gt_j, int n_allele);
@@ -40,9 +41,9 @@ void free_genotype_info(GenotypeInfo *gt_info);
 // Matrix functions
 PairwiseMatrices *init_pairwise_matrices(const bcf_hdr_t *hdr);
 void free_pairwise_matrices(PairwiseMatrices *pairwise_matrices);
-bool update_pairwise_matrices(PairwiseMatrices *pairwise_matrices, int i, int j);
-int save_pairwise_matrices_bin(const char *filename, PairwiseMatrices *pairwise_matrices);
-int save_pairwise_matrices_txt(const char *filename, PairwiseMatrices *pairwise_matrices);
+// bool update_pairwise_matrices(PairwiseMatrices *pairwise_matrices, int i, int j);
+int save_pairwise_matrices_bin(const char *filename1, const char *filename2, PairwiseMatrices *pairwise_matrices);
+int save_pairwise_matrices_txt(const char *filename1, const char *filename2, PairwiseMatrices *pairwise_matrices);
 
 // Others
 char *format_regions(char *list[], int start_idx, int n);

@@ -6,7 +6,9 @@
 #include <string.h>
 #include "vcf_pairwise_matrices.h"
 
-// Main function
+static inline bool normalize_gt(int32_t *gt, int ploidy);
+
+// Main functions
 PairwiseMatrices *get_vcf_pairwise_matrices(const char *filename, char *regions) {
 
     bcf_srs_t *sr = set_reader_for_pairwise(filename, regions);
@@ -87,13 +89,11 @@ PairwiseMatrices *get_vcf_pairwise_matrices(const char *filename, char *regions)
 
         for (int i = 0; i < n; i++) {
             for (int j = i + 1; j < n; j++) {
-                if (i == j)
-                    continue;
                 GtComparisonResult result = gt_cmp(gt_info[i], gt_info[j], n_allele);
                 switch(result) {
                     case GT_MISMATCH: {
-                        pairwise_matrices->diss_matrix[i][j]++;
-                        pairwise_matrices->diss_matrix[j][i]++;
+                        pairwise_matrices->dist_matrix[i][j]++;
+                        pairwise_matrices->dist_matrix[j][i]++;
                     }
                     break;                        
                     case GT_MATCH: {
@@ -125,6 +125,141 @@ PairwiseMatrices *get_vcf_pairwise_matrices(const char *filename, char *regions)
     free(gt_info);
 
     return pairwise_matrices;
+}
+
+PairwiseMatrices *easy_get_vcf_pairwise_matrices(const char *filename, char *regions) {
+
+    bcf_srs_t *sr = set_reader_for_pairwise(filename, regions);
+    if (!sr)
+        return NULL;
+
+    bcf_hdr_t *hdr = bcf_sr_get_header(sr, 0);
+    if (!hdr) {
+        bcf_sr_destroy(sr);
+        return NULL;
+    }
+       
+    int n_samples = bcf_hdr_nsamples(hdr);
+    if (n_samples <= 0)
+    {
+        bcf_sr_destroy(sr);
+        return NULL;
+    } 
+
+    PairwiseMatrices *pairwise_matrices = init_pairwise_matrices(hdr);
+    if(!pairwise_matrices) {
+        bcf_sr_destroy(sr);
+        return NULL;
+    }
+
+    int32_t *gt_arr = NULL;
+    int ngt_arr = 0;
+    size_t n = (size_t)n_samples;
+    int n_variants = 0;
+
+    bool *full = malloc(n * sizeof *full);
+    if (!full) {
+        free_pairwise_matrices(pairwise_matrices);
+        bcf_sr_destroy(sr);
+        return NULL;
+    }
+
+    while (bcf_sr_next_line(sr)) {
+        bcf1_t *rec = bcf_sr_get_line(sr, 0);
+        if (!rec) {
+            free(full);
+            free(gt_arr);
+            free_pairwise_matrices(pairwise_matrices);
+            bcf_sr_destroy(sr);
+            return NULL;
+        }
+
+        int ngt = bcf_get_genotypes(hdr, rec, &gt_arr, &ngt_arr);
+        if (ngt <= 0) {
+            continue;
+        }
+
+        if (ngt % n != 0) {
+            free(full);
+            free(gt_arr);
+            free_pairwise_matrices(pairwise_matrices);
+            bcf_sr_destroy(sr);
+            return NULL;
+        }
+
+        int max_ploidy = ngt / n;
+
+        n_variants++;
+
+        for (size_t k = 0; k < n; k++)
+            full[k] = normalize_gt(gt_arr + k * max_ploidy, max_ploidy);
+
+        for (size_t i = 0; i < n; i++) {
+            if (!full[i])
+                continue;
+            int32_t *gt_i = gt_arr + i * max_ploidy;
+
+            for (size_t j = i + 1; j < n; j++) {
+
+                int32_t *gt_j = gt_arr + j * max_ploidy;
+                if (full[j] && memcmp(gt_i, gt_j, max_ploidy * sizeof(int32_t)) == 0)
+                    pairwise_matrices->sim_matrix[i][j]++;
+                
+            }
+        }
+
+    }
+
+    if (sr->errnum != 0) {
+        free(full);
+        free(gt_arr);
+        free_pairwise_matrices(pairwise_matrices);
+        bcf_sr_destroy(sr);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = i + 1; j < n; j++) {
+            int s = pairwise_matrices->sim_matrix[i][j];
+            pairwise_matrices->sim_matrix[j][i]  = s;
+            pairwise_matrices->dist_matrix[i][j] = n_variants - s;
+            pairwise_matrices->dist_matrix[j][i] = n_variants - s;
+        }
+    }
+
+    free(full);
+    bcf_sr_destroy(sr);
+    free(gt_arr); 
+
+    return pairwise_matrices;
+}
+
+static inline bool normalize_gt(int32_t *gt, int max_ploidy) {
+    int p;
+    for (p = 0; p < max_ploidy; p++) {
+        if (gt[p] == bcf_int32_vector_end)
+            break;
+        if (bcf_gt_is_missing(gt[p]))
+            return false;
+        gt[p] = bcf_gt_allele(gt[p]);
+    }
+
+    if (p == 0)
+        return false;
+
+    for (int a = 1; a < p; a++) {   
+        int32_t v = gt[a];
+        int q = a - 1;
+
+        while (q >= 0 && gt[q] > v) {
+            gt[q + 1] = gt[q];
+            q--;
+        }
+
+        gt[q + 1] = v;
+    }
+
+    return true;
 }
 
 
@@ -230,62 +365,62 @@ PairwiseMatrices *init_pairwise_matrices(const bcf_hdr_t *hdr) {
 
     size_t n = (size_t)n_samples;
 
-    int **diss_matrix = malloc(n * sizeof(int *));
-    if (!diss_matrix) {
+    int **dist_matrix = malloc(n * sizeof(int *));
+    if (!dist_matrix) {
         return NULL;
     }
 
-    int *diss_data = calloc(n * n, sizeof(int));
-    if (!diss_data) {
-        free(diss_matrix);
+    int *dist_data = calloc(n * n, sizeof(int));
+    if (!dist_data) {
+        free(dist_matrix);
         return NULL;
     }
 
     int **sim_matrix = malloc(n * sizeof(int *));
     if (!sim_matrix) {
-        free(diss_matrix);
-        free(diss_data);
+        free(dist_matrix);
+        free(dist_data);
         return NULL;
     }
 
     int *sim_data = calloc(n * n, sizeof(int));
     if (!sim_data) {
-        free(diss_matrix);
-        free(diss_data);
+        free(dist_matrix);
+        free(dist_data);
         free(sim_matrix);
         return NULL;
     }
 
     PairwiseMatrices *pairwise_matrices = malloc(sizeof(PairwiseMatrices));
     if (!pairwise_matrices) {
-        free(diss_data);
+        free(dist_data);
         free(sim_data);
-        free(diss_matrix);
+        free(dist_matrix);
         free(sim_matrix);
         return NULL;
     }
 
     char **samples = malloc(n * sizeof(char *));
     if(!samples) {
-        free(diss_data);
+        free(dist_data);
         free(sim_data);
-        free(diss_matrix);
+        free(dist_matrix);
         free(sim_matrix);
         free(pairwise_matrices);
         return NULL;
     }
 
     for (int i = 0; i < n; i++) {
-        diss_matrix[i] = diss_data + (i * n);
+        dist_matrix[i] = dist_data + (i * n);
         sim_matrix[i] = sim_data + (i * n);
 
         samples[i] = strdup(hdr->samples[i]);
         if (!samples[i]) {
             for (int j = 0; j < i; j++)
                 free(samples[j]);
-            free(diss_data);
+            free(dist_data);
             free(sim_data);
-            free(diss_matrix);
+            free(dist_matrix);
             free(sim_matrix);
             free(pairwise_matrices);
             free(samples);
@@ -293,7 +428,7 @@ PairwiseMatrices *init_pairwise_matrices(const bcf_hdr_t *hdr) {
         }
     }
 
-    pairwise_matrices->diss_matrix = diss_matrix;
+    pairwise_matrices->dist_matrix = dist_matrix;
     pairwise_matrices->sim_matrix = sim_matrix;
     pairwise_matrices->pm_info.n_samples = n_samples;
     pairwise_matrices->pm_info.samples = samples;
@@ -306,9 +441,9 @@ void free_pairwise_matrices(PairwiseMatrices *pairwise_matrices) {
     if (!pairwise_matrices)
         return;
 
-    if (pairwise_matrices->diss_matrix) {
-        free(pairwise_matrices->diss_matrix[0]);
-        free(pairwise_matrices->diss_matrix);
+    if (pairwise_matrices->dist_matrix) {
+        free(pairwise_matrices->dist_matrix[0]);
+        free(pairwise_matrices->dist_matrix);
     }
 
     if (pairwise_matrices->sim_matrix) {
@@ -325,9 +460,10 @@ void free_pairwise_matrices(PairwiseMatrices *pairwise_matrices) {
     free(pairwise_matrices);
 }
 
+/*
 bool update_pairwise_matrices(PairwiseMatrices *pairwise_matrices, int i, int j) {
 
-    if (!pairwise_matrices || i < 0 || j < 0 || !pairwise_matrices->diss_matrix || !pairwise_matrices->diss_matrix[0])
+    if (!pairwise_matrices || i < 0 || j < 0 || !pairwise_matrices->dist_matrix || !pairwise_matrices->dist_matrix[0])
         return false;
 
     size_t n = (size_t)pairwise_matrices->pm_info.n_samples;
@@ -337,43 +473,52 @@ bool update_pairwise_matrices(PairwiseMatrices *pairwise_matrices, int i, int j)
     if (i == j)
         return true;
 
-    pairwise_matrices->diss_matrix[i][j]++;
-    pairwise_matrices->diss_matrix[j][i]++;
+    pairwise_matrices->dist_matrix[i][j]++;
+    pairwise_matrices->dist_matrix[j][i]++;
 
     return true;
-}
+} */
 
-int save_pairwise_matrices_bin(const char *filename, PairwiseMatrices *pairwise_matrices) {
+int save_pairwise_matrices_bin(const char *filename1, const char *filename2, PairwiseMatrices *pairwise_matrices) {
 
-    if (!pairwise_matrices || !pairwise_matrices->diss_matrix || !pairwise_matrices->diss_matrix[0] || pairwise_matrices->pm_info.n_samples <= 0){
+    if (!pairwise_matrices || !pairwise_matrices->dist_matrix || !pairwise_matrices->dist_matrix[0] || pairwise_matrices->pm_info.n_samples <= 0){
         return -1;
     }
 
     size_t n = (size_t)pairwise_matrices->pm_info.n_samples;
 
-    FILE *file = fopen(filename, "wb");
+    FILE *file = fopen(filename1, "wb");
     if (!file) {
         return -2;
     }
 
     size_t dim = n * n;
-    size_t writed = fwrite(pairwise_matrices->diss_matrix[0], sizeof(int), dim, file);
+    size_t writed = fwrite(pairwise_matrices->dist_matrix[0], sizeof(int), dim, file);
 
     fclose(file);
 
-    if (writed != dim)
+    file = fopen(filename2, "wb");
+    if (!file) {
+        return -2;
+    }
+
+    writed += fwrite(pairwise_matrices->sim_matrix[0], sizeof(int), dim, file);
+
+    fclose(file);
+
+    if (writed != dim * 2)
         return -2;
 
     return 0;  // -1 matrice non valida, -2 problema file, 0 successo
 }
 
-int save_pairwise_matrices_txt(const char *filename, PairwiseMatrices *pairwise_matrices) {
+int save_pairwise_matrices_txt(const char *filename1, const char *filename2, PairwiseMatrices *pairwise_matrices) {
 
-    if (!pairwise_matrices || !pairwise_matrices->diss_matrix || !pairwise_matrices->diss_matrix[0] || pairwise_matrices->pm_info.n_samples <= 0){
+    if (!pairwise_matrices || !pairwise_matrices->dist_matrix || !pairwise_matrices->dist_matrix[0] || pairwise_matrices->pm_info.n_samples <= 0){
         return -1;
     }
 
-    FILE *file = fopen(filename, "w");
+    FILE *file = fopen(filename1, "w");
     if (!file) {
         return -2;
     }
@@ -382,7 +527,25 @@ int save_pairwise_matrices_txt(const char *filename, PairwiseMatrices *pairwise_
 
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            fprintf(file, "%d", pairwise_matrices->diss_matrix[i][j]);
+            fprintf(file, "%d", pairwise_matrices->dist_matrix[i][j]);
+
+            if (j < n - 1)
+                fprintf(file, " ");
+        }
+        fprintf(file, "\n");
+    }
+
+    fclose(file);
+
+
+    file = fopen(filename2, "w");
+    if (!file) {
+        return -2;
+    }
+
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            fprintf(file, "%d", pairwise_matrices->sim_matrix[i][j]);
 
             if (j < n - 1)
                 fprintf(file, " ");
