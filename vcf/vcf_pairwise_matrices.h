@@ -24,8 +24,8 @@ typedef struct {
 } PairwiseMatrixInfo;
 
 typedef struct {
-    int **dist_matrix;
-    int **sim_matrix;
+    double **dist_matrix;
+    double **sim_matrix;
     PairwiseMatrixInfo pm_info;
 } PairwiseMatrices;
 
@@ -41,7 +41,6 @@ void free_genotype_info(GenotypeInfo *gt_info);
 // Matrix functions
 PairwiseMatrices *init_pairwise_matrices(const bcf_hdr_t *hdr);
 void free_pairwise_matrices(PairwiseMatrices *pairwise_matrices);
-// bool update_pairwise_matrices(PairwiseMatrices *pairwise_matrices, int i, int j);
 int save_pairwise_matrices_bin(const char *filename1, const char *filename2, PairwiseMatrices *pairwise_matrices);
 int save_pairwise_matrices_txt(const char *filename1, const char *filename2, PairwiseMatrices *pairwise_matrices);
 

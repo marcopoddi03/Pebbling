@@ -365,25 +365,25 @@ PairwiseMatrices *init_pairwise_matrices(const bcf_hdr_t *hdr) {
 
     size_t n = (size_t)n_samples;
 
-    int **dist_matrix = malloc(n * sizeof(int *));
+    double **dist_matrix = malloc(n * sizeof(double *));
     if (!dist_matrix) {
         return NULL;
     }
 
-    int *dist_data = calloc(n * n, sizeof(int));
+    double *dist_data = calloc(n * n, sizeof(double));
     if (!dist_data) {
         free(dist_matrix);
         return NULL;
     }
 
-    int **sim_matrix = malloc(n * sizeof(int *));
+    double **sim_matrix = malloc(n * sizeof(double *));
     if (!sim_matrix) {
         free(dist_matrix);
         free(dist_data);
         return NULL;
     }
 
-    int *sim_data = calloc(n * n, sizeof(int));
+    double *sim_data = calloc(n * n, sizeof(double));
     if (!sim_data) {
         free(dist_matrix);
         free(dist_data);
@@ -460,25 +460,6 @@ void free_pairwise_matrices(PairwiseMatrices *pairwise_matrices) {
     free(pairwise_matrices);
 }
 
-/*
-bool update_pairwise_matrices(PairwiseMatrices *pairwise_matrices, int i, int j) {
-
-    if (!pairwise_matrices || i < 0 || j < 0 || !pairwise_matrices->dist_matrix || !pairwise_matrices->dist_matrix[0])
-        return false;
-
-    size_t n = (size_t)pairwise_matrices->pm_info.n_samples;
-    if (i >= n || j >= n)
-        return false;
-
-    if (i == j)
-        return true;
-
-    pairwise_matrices->dist_matrix[i][j]++;
-    pairwise_matrices->dist_matrix[j][i]++;
-
-    return true;
-} */
-
 int save_pairwise_matrices_bin(const char *filename1, const char *filename2, PairwiseMatrices *pairwise_matrices) {
 
     if (!pairwise_matrices || !pairwise_matrices->dist_matrix || !pairwise_matrices->dist_matrix[0] || pairwise_matrices->pm_info.n_samples <= 0){
@@ -527,7 +508,7 @@ int save_pairwise_matrices_txt(const char *filename1, const char *filename2, Pai
 
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            fprintf(file, "%d", pairwise_matrices->dist_matrix[i][j]);
+            fprintf(file, "%f", pairwise_matrices->dist_matrix[i][j]);
 
             if (j < n - 1)
                 fprintf(file, " ");
@@ -545,7 +526,7 @@ int save_pairwise_matrices_txt(const char *filename1, const char *filename2, Pai
 
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            fprintf(file, "%d", pairwise_matrices->sim_matrix[i][j]);
+            fprintf(file, "%f", pairwise_matrices->sim_matrix[i][j]);
 
             if (j < n - 1)
                 fprintf(file, " ");
