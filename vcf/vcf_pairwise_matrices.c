@@ -6,7 +6,7 @@
 #include <string.h>
 #include "vcf_pairwise_matrices.h"
 
-static inline bool normalize_gt(int32_t *gt, int ploidy);
+static inline bool normalize_gt(int32_t *gt, int max_ploidy);
 
 // Main functions
 PairwiseMatrices *get_vcf_pairwise_matrices(const char *filename, char *regions) {

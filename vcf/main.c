@@ -5,7 +5,7 @@
 
 
 int main(int argc, char **argv) {
-    if (argc < 4) {
+    if (argc < 5) {
         fprintf(stderr, "Usage: %s <file_in.vcf.gz> <dist_matrix_out.txt> <sim_matrix_out.txt> <chr1> [chr2 chr3 ...]\n", argv[0]);
         fprintf(stderr, "Example: %s data.vcf.gz chr3 chr8 chr15 chr19 chr21\n", argv[0]);
         return 1;
@@ -15,7 +15,7 @@ int main(int argc, char **argv) {
     char *filename_out1= argv[2];
     char *filename_out2= argv[3];
 
-    char *regions = format_regions(argv, 3, argc);
+    char *regions = format_regions(argv, 4, argc);
     if (!regions)
         return 1;
 
