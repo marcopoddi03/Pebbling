@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
     if (!regions)
         return 1;
 
-    PairwiseMatrices *pairwise_matrices = easy_get_vcf_pairwise_matrices(filename_in, regions);
+    PairwiseMatrices *pairwise_matrices = easy_get_vcf_pairwise_matrices(filename_in, regions, true);
 
     if (!pairwise_matrices) {
         free(regions);

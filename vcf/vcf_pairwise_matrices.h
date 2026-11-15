@@ -31,7 +31,7 @@ typedef struct {
 
 // Main functions
 PairwiseMatrices *get_vcf_pairwise_matrices(const char *filename, char *regions);
-PairwiseMatrices *easy_get_vcf_pairwise_matrices(const char *filename, char *regions);
+PairwiseMatrices *easy_get_vcf_pairwise_matrices(const char *filename, char *regions, bool normalize);
 
 // Genotype functions
 GtComparisonResult gt_cmp(const GenotypeInfo *gt_i, const GenotypeInfo *gt_j, int n_allele);

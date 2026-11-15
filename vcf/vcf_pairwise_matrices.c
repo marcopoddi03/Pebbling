@@ -127,7 +127,7 @@ PairwiseMatrices *get_vcf_pairwise_matrices(const char *filename, char *regions)
     return pairwise_matrices;
 }
 
-PairwiseMatrices *easy_get_vcf_pairwise_matrices(const char *filename, char *regions) {
+PairwiseMatrices *easy_get_vcf_pairwise_matrices(const char *filename, char *regions, bool normalize) {
 
     bcf_srs_t *sr = set_reader_for_pairwise(filename, regions);
     if (!sr)
@@ -218,15 +218,27 @@ PairwiseMatrices *easy_get_vcf_pairwise_matrices(const char *filename, char *reg
         return NULL;
     }
 
-    for (size_t i = 0; i < n; i++) {
-        for (size_t j = i + 1; j < n; j++) {
-            int s = pairwise_matrices->sim_matrix[i][j];
-            pairwise_matrices->sim_matrix[j][i]  = s;
-            pairwise_matrices->dist_matrix[i][j] = n_variants - s;
-            pairwise_matrices->dist_matrix[j][i] = n_variants - s;
+    if (normalize && n_variants > 0) {
+        for (size_t i = 0; i < n; i++) {
+            for (size_t j = i + 1; j < n; j++) {
+                double s = pairwise_matrices->sim_matrix[i][j] / n_variants;
+                pairwise_matrices->sim_matrix[i][j] = s;
+                pairwise_matrices->sim_matrix[j][i]  = s;
+                pairwise_matrices->dist_matrix[i][j] = 1.0 - s;
+                pairwise_matrices->dist_matrix[j][i] = 1.0 - s;
+            }
+        }
+    } else {
+        for (size_t i = 0; i < n; i++) {
+            for (size_t j = i + 1; j < n; j++) {
+                int s = pairwise_matrices->sim_matrix[i][j];
+                pairwise_matrices->sim_matrix[j][i]  = s;
+                pairwise_matrices->dist_matrix[i][j] = n_variants - s;
+                pairwise_matrices->dist_matrix[j][i] = n_variants - s;
+            }
         }
     }
-
+    
     free(full);
     bcf_sr_destroy(sr);
     free(gt_arr); 
@@ -474,7 +486,7 @@ int save_pairwise_matrices_bin(const char *filename1, const char *filename2, Pai
     }
 
     size_t dim = n * n;
-    size_t writed = fwrite(pairwise_matrices->dist_matrix[0], sizeof(int), dim, file);
+    size_t writed = fwrite(pairwise_matrices->dist_matrix[0], sizeof(double), dim, file);
 
     fclose(file);
 
@@ -483,7 +495,7 @@ int save_pairwise_matrices_bin(const char *filename1, const char *filename2, Pai
         return -2;
     }
 
-    writed += fwrite(pairwise_matrices->sim_matrix[0], sizeof(int), dim, file);
+    writed += fwrite(pairwise_matrices->sim_matrix[0], sizeof(double), dim, file);
 
     fclose(file);
 
